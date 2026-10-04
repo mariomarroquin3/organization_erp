@@ -8,6 +8,7 @@ const LINKS = [
   { href: '/personas', label: 'Personas' },
   { href: '/movimientos', label: 'Altas y bajas' },
   { href: '/metricas', label: 'Métricas' },
+  { href: '/informe-anual', label: 'Informe anual' },
   { href: '/exportar', label: 'Exportar' },
   { href: '/configuracion', label: 'Configuración' },
 ];

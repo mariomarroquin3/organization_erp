@@ -57,6 +57,7 @@ Todas las vistas usan `security_invoker`, así que respetan el RLS (en el origin
 | `fn_report_matrix(año)` | Matriz persona × mes: informó, participó, horas, cargo y grupo de ese mes. Base de la exportación a Excel. |
 | `fn_service_year_summary(año)` | **Completitud** por persona: meses esperados, informados, con participación y porcentajes. Es la métrica de quien no es PR ni PA. |
 | `fn_monthly_summary(año)` | Resumen de la organización por mes y grupo. |
+| `fn_import_persons(filas)` | Alta masiva desde Excel (migración 0900): persona, alta, grupo, cargos y contactos de varias filas en una sola transacción; si una fila falla no se guarda ninguna y el error indica la fila. |
 
 Desde el cliente: `supabase.from('view_goal_compliance').select().eq('service_year', 2026)` y `supabase.rpc('fn_service_year_summary', { p_service_year: 2026 })`.
 
