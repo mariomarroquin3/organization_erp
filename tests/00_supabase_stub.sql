@@ -9,8 +9,13 @@ end $$;
 create schema extensions;
 create schema auth;
 create table auth.users (id uuid primary key default gen_random_uuid(), email text);
+-- Igual que Supabase: acepta el claim suelto (pruebas SQL) o el JSON
+-- completo que pone PostgREST en request.jwt.claims.
 create function auth.uid() returns uuid language sql stable as $$
-  select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
+  select coalesce(
+    nullif(current_setting('request.jwt.claim.sub', true), ''),
+    nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub'
+  )::uuid
 $$;
 grant usage on schema auth, public to anon, authenticated;
 -- Igual que Supabase: privilegios por defecto amplios para anon
