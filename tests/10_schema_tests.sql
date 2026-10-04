@@ -366,4 +366,67 @@ select pg_temp.expect_error($$ select fn_import_persons('[{"row": 2, "first_name
                             '%No tienes permiso%');
 rollback;
 
+-- ---------------------------------------------------------------------
+-- Reagrupaciones y bautismo (1000)
+-- ---------------------------------------------------------------------
+\echo '== Reagrupaciones y bautismo =='
+select pg_temp.expect_error($$
+  update catalog_groups set is_active = false where id = '00000000-0000-0000-0000-0000000000a2'
+$$, '%todavía tiene 2 persona%');
+
+begin;
+set local role authenticated;
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000002';
+-- Grupo 2 se disuelve: todos pasan a Grupo 1 desde el 1 de octubre
+select pg_temp.check(fn_reassign_groups('2026-10-01',
+  (select jsonb_agg(jsonb_build_object('person_id', person_id, 'group_id', '00000000-0000-0000-0000-0000000000a1'))
+     from view_current_group where group_id = '00000000-0000-0000-0000-0000000000a2'),
+  array['00000000-0000-0000-0000-0000000000a2'::uuid]) = 2, 'reagrupación mueve a 2 personas');
+select pg_temp.check((select not is_active from catalog_groups where id = '00000000-0000-0000-0000-0000000000a2'), 'grupo disuelto queda inactivo');
+select pg_temp.check((select count(*) = 0 from view_current_group where group_id = '00000000-0000-0000-0000-0000000000a2'), 'nadie queda en el grupo disuelto');
+select pg_temp.check((select end_date = '2026-09-30' from person_group_history
+                       where person_id = '00000000-0000-0000-0000-000000000003' and group_id = '00000000-0000-0000-0000-0000000000a2'),
+                     'el periodo anterior se cierra el día antes');
+select pg_temp.check((select group_name = 'Grupo 2' from fn_report_matrix(2026)
+                       where person_id = '00000000-0000-0000-0000-000000000003' and month = 5),
+                     'los meses pasados conservan el grupo de entonces');
+select pg_temp.check((select count(*) = 0 from fn_monthly_summary(2026) where group_name = 'Grupo 1' and period = '2026-05-01' and persons > 3),
+                     'el resumen mensual histórico no cambia');
+-- Repetir el mismo cambio no hace nada
+select pg_temp.check(fn_reassign_groups('2026-10-01',
+  jsonb_build_array(jsonb_build_object('person_id', '00000000-0000-0000-0000-000000000003', 'group_id', '00000000-0000-0000-0000-0000000000a1'))) = 0,
+  'mover a alguien al grupo donde ya está no cambia nada');
+rollback;
+
+begin;
+set local role authenticated;
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000003';
+select pg_temp.expect_error($$ select fn_reassign_groups('2026-10-01', '[]') $$, '%No tienes permiso%');
+rollback;
+
+-- PNB -> PB: el PNB se cierra el día antes y no se puede volver a PNB
+begin;
+select pg_temp.check((select count(*) = 3 from catalog_roles where code in ('A', 'SM', 'PNB') and not requires_hours_report),
+                     'catálogo con A, SM y PNB sin horas');
+insert into person_roles (person_id, role_id, start_date)
+select '00000000-0000-0000-0000-000000000004', id, '2025-01-01' from catalog_roles where code = 'PNB';
+insert into person_roles (person_id, role_id, start_date)
+select '00000000-0000-0000-0000-000000000004', id, '2026-05-10' from catalog_roles where code = 'PB';
+select pg_temp.check((select pr.end_date = '2026-05-09' from person_roles pr join catalog_roles cr on cr.id = pr.role_id
+                       where pr.person_id = '00000000-0000-0000-0000-000000000004' and cr.code = 'PNB'),
+                     'al bautizarse, el PNB termina el día anterior');
+select pg_temp.expect_error($$
+  insert into person_roles (person_id, role_id, start_date)
+  select '00000000-0000-0000-0000-000000000004', id, '2026-07-01' from catalog_roles where code = 'PNB'
+$$, '%no vuelve a ser PNB%');
+select pg_temp.expect_error($$
+  insert into person_roles (person_id, role_id, start_date, end_date)
+  select '00000000-0000-0000-0000-000000000002', id, '2024-01-01', '2026-01-01' from catalog_roles where code = 'PNB'
+$$, '%no vuelve a ser PNB%');
+-- PNB que terminó antes del bautismo sí se puede registrar
+insert into person_roles (person_id, role_id, start_date, end_date)
+select '00000000-0000-0000-0000-000000000002', id, '2024-01-01', '2025-08-31' from catalog_roles where code = 'PNB';
+select pg_temp.check(true, 'PNB anterior al bautismo se puede registrar');
+rollback;
+
 \echo '== Todas las pruebas pasaron =='

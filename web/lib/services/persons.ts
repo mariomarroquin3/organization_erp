@@ -169,3 +169,16 @@ export function dayBefore(isoDate: string): string {
   d.setUTCDate(d.getUTCDate() - 1);
   return d.toISOString().slice(0, 10);
 }
+
+// ---- Reagrupación ------------------------------------------------------
+
+export interface GroupMove { person_id: string; group_id: string | null }
+
+/**
+ * Cambia de grupo a varias personas desde una fecha, en una transacción
+ * (fn_reassign_groups, migración 1000). Los periodos anteriores se cierran
+ * el día antes: los meses pasados conservan su grupo.
+ */
+export async function reassignGroups(db: Db, date: string, moves: GroupMove[], deactivate: string[] = []) {
+  return check(await db.rpc('fn_reassign_groups', { p_date: date, p_moves: moves, p_deactivate: deactivate })) as number;
+}

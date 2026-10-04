@@ -248,6 +248,10 @@ export function validateRows(
       msgs.push(`No puede tener ${roleList.filter((r) => r.requires_hours_report).map((r) => r.code).join(' y ')} a la vez.`);
     }
 
+    if (roleList.some((r) => r.code === 'PB') && roleList.some((r) => r.code === 'PNB')) {
+      msgs.push('No puede ser PB y PNB a la vez.');
+    }
+
     // Alta
     const altaName = text(v.alta_type);
     const congregation = text(v.alta_congregation) || null;
