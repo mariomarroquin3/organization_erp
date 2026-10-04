@@ -138,6 +138,108 @@ select pg_temp.check(
 select pg_temp.check((select count(*) = 1 from view_current_pr), 'Solo Ana es PR actual');
 
 -- ---------------------------------------------------------------------
+-- Altas, bajas y traslados
+-- ---------------------------------------------------------------------
+\echo '== Altas y bajas =='
+create or replace function pg_temp.mov(p_person text, p_code text, p_date date, p_cong text default null)
+returns void language sql as $$
+  insert into person_movements (person_id, movement_type_id, movement_date, congregation)
+  select p_person::uuid, id, p_date, p_cong from catalog_movement_types where code = p_code
+$$;
+
+begin;
+select pg_temp.expect_error($$select pg_temp.mov('00000000-0000-0000-0000-000000000004', 'TRASLADO_SALIDA', '2026-03-01')$$,
+  '%indica la congregación de destino%');
+select pg_temp.expect_error($$select pg_temp.mov('00000000-0000-0000-0000-000000000004', 'OTRA_BAJA', current_date + 1)$$,
+  '%no puede ser futura%');
+select pg_temp.expect_error($$update persons set is_active = false where first_name = 'Diego'$$,
+  '%registrando una baja o un alta%');
+select pg_temp.expect_error($$insert into persons (first_name, last_name, is_active) values ('X', 'Y', false)$$,
+  '%se crea activa%');
+rollback;
+
+begin;
+-- Diego (sin cargo) se traslada en marzo: deja de contar desde ese mes
+select pg_temp.mov('00000000-0000-0000-0000-000000000004', 'TRASLADO_SALIDA', '2026-03-01', 'Congregación Norte');
+select pg_temp.check((select not is_active from persons where first_name = 'Diego'), 'la baja marca inactivo');
+select pg_temp.check(
+  (select end_date = '2026-02-28' from person_group_history
+    where person_id = '00000000-0000-0000-0000-000000000004'),
+  'la baja cierra el grupo el día anterior');
+select pg_temp.check(
+  (select months_expected = 6 and months_reported = 6 and pct_reported = 100
+     from fn_service_year_summary(2026) where first_name = 'Diego'),
+  'Diego 2026: solo cuentan sep-feb (6 de 6)');
+select pg_temp.check((select count(*) = 0 from fn_report_matrix(2027) where first_name = 'Diego'),
+  'Diego no aparece en el año siguiente a su baja');
+select pg_temp.check(
+  (select persons = 1 from fn_monthly_summary(2026) where period = '2026-03-01' and group_name = 'Grupo 2'),
+  'resumen mar-2026, Grupo 2: ya no cuenta a Diego');
+select pg_temp.expect_error($$select pg_temp.mov('00000000-0000-0000-0000-000000000004', 'FALLECIMIENTO', '2026-04-01')$$,
+  '%deben alternarse%');
+
+-- Reingreso: vuelve a estar activo y tiene dos periodos
+select pg_temp.mov('00000000-0000-0000-0000-000000000004', 'REINGRESO', '2026-06-15');
+select pg_temp.check((select is_active from persons where first_name = 'Diego'), 'el reingreso reactiva');
+select pg_temp.check(
+  (select count(*) = 2 from view_membership_periods where person_id = '00000000-0000-0000-0000-000000000004'),
+  'dos periodos de pertenencia');
+select pg_temp.check(
+  not was_member_during('00000000-0000-0000-0000-000000000004', '2026-03-01', '2026-05-31')
+  and was_member_during('00000000-0000-0000-0000-000000000004', '2026-06-01', '2026-06-30'),
+  'fuera de mar-may, dentro en junio (alta a mitad de mes)');
+select pg_temp.mov('00000000-0000-0000-0000-000000000004', 'NUEVO_INGRESO', '2024-01-01');
+select pg_temp.expect_error($$delete from person_movements
+  where person_id = '00000000-0000-0000-0000-000000000004' and movement_date = '2026-03-01'$$,
+  '%deben alternarse%');
+rollback;
+
+begin;
+-- Ana (PR) se da de baja en marzo: su meta 2026 se recorta a sep-feb
+select pg_temp.mov('00000000-0000-0000-0000-000000000001', 'TRASLADO_SALIDA', '2026-03-01', 'Congregación Sur');
+select pg_temp.check(
+  (select end_date = '2026-02-28' from person_roles pr join catalog_roles cr on cr.id = pr.role_id
+    where pr.person_id = '00000000-0000-0000-0000-000000000001' and cr.code = 'PR'),
+  'la baja cierra el cargo PR el día anterior');
+select pg_temp.check(
+  (select months_in_role = 6 and goal_hours = 300 from view_goal_compliance
+    where first_name = 'Ana' and service_year = 2026),
+  'Ana 2026: meta prorrateada a 6 meses');
+select pg_temp.check((select count(*) = 0 from view_goal_compliance where first_name = 'Ana' and service_year = 2027),
+  'Ana no tiene meta 2027');
+select pg_temp.check((select count(*) = 0 from view_current_pr), 'ya no hay PR vigente');
+select pg_temp.check(
+  (select last_movement_type = 'Traslado a otra congregación' from view_persons_overview where first_name = 'Ana'),
+  'la ficha resumida muestra la última alta/baja');
+
+-- Borrar la baja (corrección) la reactiva
+delete from person_movements where person_id = '00000000-0000-0000-0000-000000000001';
+select pg_temp.check((select is_active from persons where first_name = 'Ana'), 'borrar la baja reactiva');
+rollback;
+
+begin;
+-- Persona nueva con alta por traslado: no cuenta antes de su alta
+insert into persons (id, first_name, last_name) values ('00000000-0000-0000-0000-000000000009', 'Eva', 'Gil');
+select pg_temp.mov('00000000-0000-0000-0000-000000000009', 'TRASLADO_ENTRADA', '2026-05-10', 'Congregación Este');
+select pg_temp.check(
+  (select months_expected = 4 from fn_service_year_summary(2026) where first_name = 'Eva'),
+  'Eva (alta en mayo) 2026: cuenta may-ago');
+select pg_temp.expect_error($$select pg_temp.mov('00000000-0000-0000-0000-000000000009', 'OTRA_BAJA', '2026-05-10')$$,
+  '%uq_person_movements_date%');
+
+-- Borrado físico
+select pg_temp.expect_error($$delete from persons where first_name = 'Ana'$$, '%con historial%');
+select pg_temp.expect_error($$delete from persons where first_name = 'Eva'$$, '%con historial%');
+insert into persons (id, first_name, last_name) values ('00000000-0000-0000-0000-000000000008', 'Por', 'Error');
+delete from persons where id = '00000000-0000-0000-0000-000000000008';
+select pg_temp.check(not exists (select 1 from persons where id = '00000000-0000-0000-0000-000000000008'),
+  'se puede borrar a alguien capturado por error, sin historial');
+select pg_temp.check(
+  (select confdeltype = 'r' from pg_constraint where conname = 'monthly_reports_person_id_fkey'),
+  'los informes ya no se borran en cascada');
+rollback;
+
+-- ---------------------------------------------------------------------
 -- Seguridad
 -- ---------------------------------------------------------------------
 \echo '== Seguridad =='
@@ -175,6 +277,8 @@ select pg_temp.check((select count(*) = 3 from view_goal_compliance where servic
 select pg_temp.check((select count(*) = 1 from app_users), 'READER solo ve su cuenta');
 select pg_temp.expect_error($$insert into persons (first_name, last_name) values ('X', 'Y')$$, '%row-level security%');
 select pg_temp.check((select count(*) = 0 from audit_log), 'READER no ve la bitácora');
+select pg_temp.check((select count(*) = 7 from catalog_movement_types), 'READER lee tipos de alta/baja');
+select pg_temp.expect_error($$select pg_temp.mov('00000000-0000-0000-0000-000000000004', 'OTRA_BAJA', '2026-03-01')$$, '%row-level security%');
 rollback;
 
 -- ADMIN: escribe datos, ve cuentas, no las modifica

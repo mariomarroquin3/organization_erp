@@ -8,7 +8,8 @@ const DESCRIPTIONS: Record<string, string> = {
   completitud: 'Meses informados y con participación por persona (incluye a quienes no son PR ni PA).',
   matriz: 'Una fila por persona y una columna por mes: horas para PR/PA, Sí/No para el resto.',
   mensual: 'Informes recibidos, participación y horas por mes y grupo.',
-  personas: 'Listado actual con grupo y cargos.',
+  personas: 'Listado actual con grupo, cargos y última alta o baja.',
+  movimientos: 'Altas (nuevo ingreso, traslado, reingreso) y bajas del año, con congregación de origen o destino.',
 };
 
 export default async function ExportarPage({ searchParams }: { searchParams: SearchParams }) {

@@ -1,6 +1,7 @@
 import type { Db } from '@/lib/supabase/server';
 import { periodDate, type YearMonth } from '@/lib/service-year';
 import { check, ServiceError } from './errors';
+import { listMembershipPeriods, wasMemberDuring } from './movements';
 import { planMonthSave, type ExistingReport, type PersonInfo, type SheetEntry } from './report-plan';
 
 export interface SheetRow {
@@ -14,20 +15,24 @@ export interface SheetRow {
 }
 
 /**
- * Hoja de captura de un mes: personas activas (y las inactivas que ya
- * tienen informe ese mes), su grupo y su cargo con horas en ese mes.
+ * Hoja de captura de un mes: personas que eran miembros ese mes (según
+ * sus altas y bajas) y las que ya tienen informe, con su grupo y su
+ * cargo con horas en ese mes.
  */
 export async function getMonthSheet(db: Db, ym: YearMonth): Promise<SheetRow[]> {
   const start = periodDate(ym);
   const end = lastDayOfMonth(ym);
-  const [persons, groups, roles, reports] = await Promise.all([
+  const [persons, groups, roles, reports, periods] = await Promise.all([
     db.from('persons').select('id, first_name, last_name, is_active').order('last_name').order('first_name'),
     db.from('person_group_history').select('person_id, start_date, catalog_groups(name)')
       .lte('start_date', end).or(`end_date.is.null,end_date.gte.${start}`)
       .order('start_date', { ascending: false }),
     db.from('view_hours_role_months').select('person_id, role_code').eq('period', start),
     db.from('monthly_reports').select('id, person_id, participated, hours').eq('year', ym.year).eq('month', ym.month),
+    listMembershipPeriods(db),
   ]);
+  const periodsOf = new Map<string, typeof periods>();
+  for (const p of periods) periodsOf.set(p.person_id, [...(periodsOf.get(p.person_id) ?? []), p]);
 
   const groupOf = new Map<string, string>();
   for (const g of check(groups) as unknown as { person_id: string; catalog_groups: { name: string } | null }[]) {
@@ -37,7 +42,7 @@ export async function getMonthSheet(db: Db, ym: YearMonth): Promise<SheetRow[]> 
   const reportOf = new Map((check(reports) as ExistingReport[]).map((r) => [r.person_id, r]));
 
   return (check(persons) as { id: string; first_name: string; last_name: string; is_active: boolean }[])
-    .filter((p) => p.is_active || reportOf.has(p.id))
+    .filter((p) => reportOf.has(p.id) || wasMemberDuring(periodsOf.get(p.id) ?? [], start, end))
     .map((p) => ({
       person_id: p.id,
       first_name: p.first_name,

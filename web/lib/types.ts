@@ -24,6 +24,7 @@ export interface PersonOverview {
   person_id: string; first_name: string; last_name: string; is_active: boolean; birth_date: string | null;
   group_id: string | null; group_name: string | null;
   current_roles: string | null; current_hours_role: string | null;
+  last_movement_type: string | null; last_movement_date: string | null;
 }
 
 export interface RoleHistoryRow {
@@ -93,3 +94,19 @@ export interface AppUser {
   id: string; person_id: string | null; display_name: string | null; is_active: boolean;
   system_role_id: string; catalog_system_roles: { code: SystemRole; name: string } | null;
 }
+
+export type MovementDirection = 'ALTA' | 'BAJA';
+
+export interface MovementType {
+  id: string; code: string; name: string; direction: MovementDirection;
+  requires_congregation: boolean; is_active: boolean; sort_order: number;
+}
+
+export interface PersonMovement {
+  id: string; person_id: string; first_name: string; last_name: string;
+  movement_type_id: string; type_code: string; type_name: string; direction: MovementDirection;
+  movement_date: string; service_year: number; congregation: string | null; notes: string | null;
+}
+
+/** Periodo en que la persona era miembro. Fechas inclusivas; null = sin límite. */
+export interface MembershipPeriod { person_id: string; start_date: string | null; end_date: string | null }

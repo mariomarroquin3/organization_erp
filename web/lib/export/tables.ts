@@ -1,7 +1,7 @@
 // Convierte los datos de las métricas en tablas neutrales que luego se
 // escriben a Excel (xlsx.ts) o PDF (pdf.ts). Funciones puras, probadas
 // en tests/export.test.ts.
-import type { GoalCompliance, MonthlySummary, PersonOverview, ReportMatrixRow, ServiceYearSummary } from '@/lib/types';
+import type { GoalCompliance, MonthlySummary, PersonMovement, PersonOverview, ReportMatrixRow, ServiceYearSummary } from '@/lib/types';
 import { MONTH_SHORT, serviceYearLabel, serviceYearMonths } from '@/lib/service-year';
 import { STATUS_LABEL, fmtDate } from '@/lib/format';
 
@@ -26,6 +26,7 @@ export const REPORTS = {
   matriz: 'Informes mes a mes',
   mensual: 'Resumen mensual por grupo',
   personas: 'Directorio de personas',
+  movimientos: 'Altas, bajas y traslados',
 } as const;
 export type ReportKey = keyof typeof REPORTS;
 export const REPORT_KEYS = Object.keys(REPORTS) as ReportKey[];
@@ -118,7 +119,10 @@ export function matrixTable(rows: ReportMatrixRow[], sy: number): ReportTable {
       ...months.map((m) => p.cells.get(keyOf(m.year, m.month)) ?? null),
       p.hours,
     ]),
-    notes: ['"Falta": era PR/PA ese mes y no hay informe. "—": no informó. Meses sin valor aún no cierran.'],
+    notes: [
+      '"Falta": era PR/PA ese mes y no hay informe. "—": no informó.',
+      'Celda vacía: el mes aún no cierra o la persona no era miembro ese mes (antes de su alta o después de su baja).',
+    ],
   };
 }
 
@@ -151,10 +155,32 @@ export function personsTable(rows: PersonOverview[]): ReportTable {
     columns: [
       { header: 'Apellidos', width: 18 }, { header: 'Nombre', width: 16 }, { header: 'Grupo', width: 14 },
       { header: 'Cargos', width: 14 }, { header: 'Nacimiento', width: 12 }, { header: 'Activo', width: 8 },
+      { header: 'Última alta/baja', width: 24 },
     ],
     rows: rows.map((r) => [
       r.last_name, r.first_name, r.group_name, r.current_roles, r.birth_date ? fmtDate(r.birth_date) : null,
       r.is_active ? 'Sí' : 'No',
+      r.last_movement_date ? `${fmtDate(r.last_movement_date)} · ${r.last_movement_type}` : null,
     ]),
+  };
+}
+
+export function movementsTable(rows: PersonMovement[], sy: number): ReportTable {
+  const sorted = [...rows].sort((a, b) => a.movement_date.localeCompare(b.movement_date));
+  const altas = rows.filter((r) => r.direction === 'ALTA').length;
+  return {
+    key: 'Altas y bajas',
+    title: REPORTS.movimientos,
+    subtitle: `Año de servicio ${serviceYearLabel(sy)} · ${altas} alta(s), ${rows.length - altas} baja(s)`,
+    columns: [
+      { header: 'Fecha', width: 12 }, { header: 'Apellidos', width: 18 }, { header: 'Nombre', width: 16 },
+      { header: 'Alta/Baja', width: 9 }, { header: 'Motivo', width: 28 }, { header: 'Congregación', width: 22 },
+      { header: 'Notas', width: 28 },
+    ],
+    rows: sorted.map((r) => [
+      fmtDate(r.movement_date), r.last_name, r.first_name, r.direction === 'ALTA' ? 'Alta' : 'Baja',
+      r.type_name, r.congregation, r.notes,
+    ]),
+    notes: ['Congregación: de origen en las altas por traslado, de destino en las bajas por traslado.'],
   };
 }

@@ -6,6 +6,7 @@ const LINKS = [
   { href: '/', label: 'Panel' },
   { href: '/informes', label: 'Informes del mes' },
   { href: '/personas', label: 'Personas' },
+  { href: '/movimientos', label: 'Altas y bajas' },
   { href: '/metricas', label: 'Métricas' },
   { href: '/exportar', label: 'Exportar' },
   { href: '/configuracion', label: 'Configuración' },
