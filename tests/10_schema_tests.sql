@@ -323,4 +323,47 @@ set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000003';
 select pg_temp.check((select count(*) = 0 from persons), 'cuenta desactivada no ve datos');
 rollback;
 
+-- ---------------------------------------------------------------------
+-- Importación de personas (0900)
+-- ---------------------------------------------------------------------
+\echo '== Importación =='
+begin;
+set local role authenticated;
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000002';
+select pg_temp.check(fn_import_persons(jsonb_build_array(
+  jsonb_build_object('row', 2, 'first_name', ' Imp ', 'last_name', 'Uno', 'birth_date', '1990-05-01',
+    'group_id', '00000000-0000-0000-0000-0000000000a1', 'group_start', '2026-09-01',
+    'role_ids', (select jsonb_agg(id) from catalog_roles where code in ('PR', 'PB')), 'roles_start', '2026-09-01',
+    'contacts', jsonb_build_array(jsonb_build_object('contact_type_id', (select id from catalog_contact_types where code = 'PHONE'), 'value', '555'))),
+  jsonb_build_object('row', 3, 'first_name', 'Imp', 'last_name', 'Dos',
+    'alta', jsonb_build_object('movement_type_id', (select id from catalog_movement_types where code = 'NUEVO_INGRESO'),
+                               'movement_date', '2026-09-15'))
+)) = 2, 'ADMIN importa dos personas');
+select pg_temp.check((select first_name = 'Imp' and birth_date = '1990-05-01' from persons where last_name = 'Uno'), 'nombre recortado y fecha de nacimiento');
+select pg_temp.check((select count(*) = 2 from view_current_roles r join persons p on p.id = r.person_id where p.last_name = 'Uno'), 'cargos PR y PB vigentes');
+select pg_temp.check((select group_id = '00000000-0000-0000-0000-0000000000a1' from view_current_group g join persons p on p.id = g.person_id where p.last_name = 'Uno'), 'grupo asignado');
+select pg_temp.check((select count(*) = 1 from person_contacts c join persons p on p.id = c.person_id where p.last_name = 'Uno' and c.is_primary), 'teléfono principal');
+select pg_temp.check((select count(*) = 1 from view_person_movements where last_name = 'Dos' and direction = 'ALTA'), 'alta registrada');
+rollback;
+
+-- Una fila mala no deja nada a medias y el error dice cuál
+begin;
+set local role authenticated;
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000002';
+select pg_temp.expect_error($$
+  select fn_import_persons(jsonb_build_array(
+    jsonb_build_object('row', 2, 'first_name', 'Bien', 'last_name', 'Uno'),
+    jsonb_build_object('row', 7, 'first_name', 'Mal', 'last_name', 'Dos',
+      'role_ids', (select jsonb_agg(id) from catalog_roles where code in ('PR', 'PA')), 'roles_start', '2026-09-01')))
+$$, 'Fila 7:%');
+select pg_temp.check((select count(*) = 0 from persons where first_name in ('Bien', 'Mal')), 'importación fallida no guarda ninguna fila');
+rollback;
+
+begin;
+set local role authenticated;
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000003';
+select pg_temp.expect_error($$ select fn_import_persons('[{"row": 2, "first_name": "X", "last_name": "Y"}]') $$,
+                            '%No tienes permiso%');
+rollback;
+
 \echo '== Todas las pruebas pasaron =='

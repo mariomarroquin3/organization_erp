@@ -23,7 +23,10 @@ export default async function PersonasPage({ searchParams }: { searchParams: Sea
   return (
     <>
       <PageHeader title="Personas">
-        {session?.canEdit ? <Link className="btn" href="/personas/nueva">+ Nueva persona</Link> : null}
+        {session?.canEdit ? <>
+          <Link className="btn-secondary" href="/personas/importar">Importar desde Excel</Link>
+          <Link className="btn" href="/personas/nueva">+ Nueva persona</Link>
+        </> : null}
       </PageHeader>
 
       <form className="toolbar" action="/personas">

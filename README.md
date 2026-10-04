@@ -9,7 +9,7 @@ El diseño y sus decisiones están en [`docs/MODELO_DATOS.md`](docs/MODELO_DATOS
 ```
 web/            aplicación (Next.js + supabase-js), ver "Aplicación web"
 supabase/
-  migrations/   esquema en orden (núcleo, metas, informes, vistas, seguridad, bitácora, catálogos, altas/bajas)
+  migrations/   esquema en orden (núcleo, metas, informes, vistas, seguridad, bitácora, catálogos, altas/bajas, importación)
   seed.sql      datos de demostración, solo para desarrollo local
 tests/
   00_supabase_stub.sql   simula auth/roles de Supabase en un Postgres normal
@@ -54,8 +54,10 @@ Pantallas:
 | Panel | Personas activas, informes del último mes cerrado, completitud promedio, avance de metas PR/PA y quién va atrasado. |
 | Informes del mes | Hoja de captura mensual: Sí / No / Sin informe para todos y horas para quien era PR o PA ese mes (obligatorias). Guarda solo lo que cambió. |
 | Personas | Listado con filtros; ficha con metas del año, informes mes a mes, altas/bajas/traslados, cargos, grupos, contactos y fechas. |
+| Importar desde Excel | En Personas: plantilla descargable (con listas de grupos, cargos y motivos de alta), vista previa con los errores de cada fila y guardado en una sola transacción (`fn_import_persons`). Omite a quien ya existe con el mismo nombre. |
 | Altas y bajas | Altas, bajas y traslados del año de servicio con totales; exportable a Excel o PDF. |
 | Métricas | Cumplimiento de metas PR/PA, completitud por persona (con filtro "solo quienes no son PR ni PA") y resumen mensual por grupo. |
+| Informe anual | Cierre del año de servicio (1 sep – 31 ago): estado del año, informes recibidos, horas, resultado de cada PR y PA, totales por grupo; descarga en Excel o PDF con el detalle mes a mes y las altas/bajas. |
 | Exportar | Cada informe en Excel o PDF, o todos juntos en un solo archivo. |
 | Configuración | Metas de horas por cargo y año, grupos, cargos y cuentas de acceso. |
 
@@ -67,7 +69,8 @@ Código:
 web/
   app/              páginas, acciones de servidor y /api/export
   lib/services/     capa de servicios: personas, informes, métricas, catálogos, sesión
-  lib/export/       tablas de informes -> Excel (exceljs) y PDF (jsPDF)
+  lib/export/       tablas de informes -> Excel (exceljs) y PDF (jsPDF); annual.ts = informe anual
+  lib/import/       plantilla, lectura y validación de la importación de personas
   tests/            pruebas unitarias (vitest)
 ```
 

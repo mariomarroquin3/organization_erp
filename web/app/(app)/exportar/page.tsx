@@ -25,6 +25,14 @@ export default async function ExportarPage({ searchParams }: { searchParams: Sea
           <thead><tr><th>Informe</th><th>Contenido</th><th>Descargar</th></tr></thead>
           <tbody>
             <tr className="highlight">
+              <td><strong>Informe del año de servicio</strong></td>
+              <td>Resumen de cierre del año {sy} (sep–ago): informes, horas, resultado de cada PR y PA, totales por grupo, detalle mes a mes y altas/bajas. <a href={`/informe-anual?anio=${sy}`}>Ver en pantalla</a></td>
+              <td className="nowrap">
+                <a className="btn" href={link('anual', 'xlsx')}>Excel</a>{' '}
+                <a className="btn-secondary" href={link('anual', 'pdf')}>PDF</a>
+              </td>
+            </tr>
+            <tr>
               <td><strong>Todos los informes</strong></td>
               <td>Un solo archivo con todos los informes del año {sy} (una hoja o sección por informe).</td>
               <td className="nowrap">
