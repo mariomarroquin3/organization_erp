@@ -9,7 +9,7 @@ import { parseServiceYear } from '@/lib/service-year';
 
 export const runtime = 'nodejs';
 
-// GET /api/export?informe=cumplimiento|completitud|matriz|mensual|personas|todo&anio=2026&formato=xlsx|pdf
+// GET /api/export?informe=cumplimiento|completitud|matriz|mensual|personas|movimientos|todo&anio=2026&formato=xlsx|pdf
 export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session?.role) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });

@@ -16,6 +16,7 @@ export function friendlyDbError(err: PostgrestError | null | undefined): string 
   if (/chk_hours_implies_participation/.test(m)) return 'Si informó horas, debe marcarse que participó.';
   if (/chk_(group|role)_dates/.test(m)) return 'La fecha de fin no puede ser anterior a la de inicio.';
   if (/uq_role_goal_year/.test(m)) return 'Ese cargo ya tiene una meta desde ese año de servicio.';
+  if (/uq_person_movements_date/.test(m)) return 'La persona ya tiene un alta o baja en esa fecha.';
   if (err.code === '23505') return 'Ya existe un registro con esos datos.';
   if (err.code === '23503') return 'El registro está en uso y no se puede borrar.';
   return m;

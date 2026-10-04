@@ -1,5 +1,5 @@
 import type { Db } from '@/lib/supabase/server';
-import type { CatalogGroup, CatalogRole, CatalogType, RoleHourGoal, AppUser } from '@/lib/types';
+import type { CatalogGroup, CatalogRole, CatalogType, MovementType, RoleHourGoal, AppUser } from '@/lib/types';
 import { check } from './errors';
 
 export async function listGroups(db: Db, { onlyActive = false } = {}) {
@@ -22,6 +22,14 @@ export async function listContactTypes(db: Db) {
 
 export async function listDateTypes(db: Db) {
   return check(await db.from('catalog_date_types').select('id, code, name').order('name')) as CatalogType[];
+}
+
+export async function listMovementTypes(db: Db, { onlyActive = false } = {}) {
+  let q = db.from('catalog_movement_types')
+    .select('id, code, name, direction, requires_congregation, is_active, sort_order')
+    .order('sort_order').order('name');
+  if (onlyActive) q = q.eq('is_active', true);
+  return check(await q) as MovementType[];
 }
 
 export async function saveGroup(db: Db, g: { id?: string; name: string; description?: string | null; is_active?: boolean }) {

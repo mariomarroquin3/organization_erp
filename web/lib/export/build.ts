@@ -1,7 +1,8 @@
 import type { Db } from '@/lib/supabase/server';
 import { goalCompliance, monthlySummary, personsOverview, reportMatrix, serviceYearSummary } from '@/lib/services/metrics';
+import { listMovements } from '@/lib/services/movements';
 import {
-  REPORT_KEYS, complianceTable, completenessTable, matrixTable, monthlyTable, personsTable,
+  REPORT_KEYS, complianceTable, completenessTable, matrixTable, monthlyTable, movementsTable, personsTable,
   type ReportKey, type ReportTable,
 } from './tables';
 
@@ -12,6 +13,7 @@ export async function buildTable(db: Db, key: ReportKey, sy: number): Promise<Re
     case 'matriz': return matrixTable(await reportMatrix(db, sy), sy);
     case 'mensual': return monthlyTable(await monthlySummary(db, sy), sy);
     case 'personas': return personsTable(await personsOverview(db));
+    case 'movimientos': return movementsTable(await listMovements(db, { serviceYear: sy }), sy);
   }
 }
 

@@ -1,8 +1,9 @@
 import type { Db } from '@/lib/supabase/server';
 import type {
-  Person, PersonOverview, RoleHistoryRow, GroupHistoryRow, PersonContact, PersonDate, MonthlyReport,
+  Person, PersonOverview, RoleHistoryRow, GroupHistoryRow, PersonContact, PersonDate, MonthlyReport, PersonMovement,
 } from '@/lib/types';
 import { check, ServiceError } from './errors';
+import { addMovement, listMovements } from './movements';
 
 export interface PersonFilters {
   q?: string;
@@ -41,7 +42,7 @@ export async function getPerson(db: Db, id: string) {
 }
 
 export async function getPersonDetail(db: Db, id: string, serviceYear: number) {
-  const [person, roles, groups, contacts, dates, reports] = await Promise.all([
+  const [person, roles, groups, contacts, dates, reports, movements] = await Promise.all([
     getPerson(db, id),
     db.from('view_role_history').select('*').eq('person_id', id).order('start_date', { ascending: false }),
     db.from('person_group_history').select('id, person_id, group_id, start_date, end_date, catalog_groups(name)')
@@ -52,6 +53,7 @@ export async function getPersonDetail(db: Db, id: string, serviceYear: number) {
       .eq('person_id', id).order('date_value'),
     db.from('monthly_reports').select('id, person_id, year, month, participated, hours, notes, service_year')
       .eq('person_id', id).eq('service_year', serviceYear).order('year').order('month'),
+    listMovements(db, { personId: id }),
   ]);
   return {
     person,
@@ -60,16 +62,31 @@ export async function getPersonDetail(db: Db, id: string, serviceYear: number) {
     contacts: check(contacts) as unknown as PersonContact[],
     dates: check(dates) as unknown as PersonDate[],
     reports: check(reports) as MonthlyReport[],
+    movements: movements as PersonMovement[],
   };
 }
 
+// is_active no se edita: lo mantienen las altas y bajas (migración 0800)
 export interface PersonInput {
-  first_name: string; last_name: string; birth_date: string | null; is_active: boolean; notes: string | null;
+  first_name: string; last_name: string; birth_date: string | null; notes: string | null;
 }
 
-export async function createPerson(db: Db, input: PersonInput & { group_id?: string | null; start_date?: string }) {
-  const { group_id, start_date, ...row } = input;
+export interface AltaInput { movement_type_id: string; movement_date: string; congregation: string | null }
+
+export async function createPerson(db: Db, input: PersonInput & {
+  group_id?: string | null; start_date?: string; alta?: AltaInput | null;
+}) {
+  const { group_id, start_date, alta, ...row } = input;
+  if (alta) {
+    // Validar antes de crear, para no dejar a la persona creada sin su alta
+    const t = check(await db.from('catalog_movement_types').select('name, direction, requires_congregation')
+      .eq('id', alta.movement_type_id).maybeSingle()) as { name: string; direction: string; requires_congregation: boolean } | null;
+    if (!t || t.direction !== 'ALTA') throw new ServiceError('Elige un motivo de alta válido.');
+    if (t.requires_congregation && !alta.congregation) throw new ServiceError(`Para "${t.name}" indica la congregación de origen.`);
+    if (alta.movement_date > today()) throw new ServiceError('La fecha de alta no puede ser futura.');
+  }
   const created = check(await db.from('persons').insert(row).select('id').single()) as { id: string };
+  if (alta) await addMovement(db, { person_id: created.id, ...alta, notes: null });
   if (group_id) {
     await addGroupPeriod(db, { person_id: created.id, group_id, start_date: start_date ?? today(), end_date: null });
   }

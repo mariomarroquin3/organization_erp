@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { requireEditor } from '@/lib/services/session';
 import * as persons from '@/lib/services/persons';
+import * as movements from '@/lib/services/movements';
 import { savePersonMonth } from '@/lib/services/reports';
 import { ServiceError } from '@/lib/services/errors';
 import { optStr, required, runAction, str, type ActionState } from '@/lib/action';
@@ -20,7 +21,6 @@ function personInput(fd: FormData): persons.PersonInput {
     first_name: required(fd, 'first_name', 'el nombre'),
     last_name: required(fd, 'last_name', 'los apellidos'),
     birth_date: optStr(fd, 'birth_date'),
-    is_active: fd.get('is_active') === 'on',
     notes: optStr(fd, 'notes'),
   };
 }
@@ -39,6 +39,11 @@ export async function createPersonAction(_p: ActionState, fd: FormData): Promise
       ...personInput(fd),
       group_id: optStr(fd, 'group_id'),
       start_date: optStr(fd, 'group_start') ?? undefined,
+      alta: optStr(fd, 'alta_type_id') ? {
+        movement_type_id: str(fd, 'alta_type_id'),
+        movement_date: required(fd, 'alta_date', 'la fecha de alta'),
+        congregation: optStr(fd, 'alta_congregation'),
+      } : null,
     });
     revalidatePath('/personas');
     return 'Persona creada.';
@@ -63,6 +68,30 @@ export async function deletePersonAction(_p: ActionState, fd: FormData): Promise
   });
   if (res.ok) redirect('/personas');
   return res;
+}
+
+export async function addMovementAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  return runAction(async () => {
+    const person_id = required(fd, 'person_id', 'la persona');
+    await movements.addMovement(await editor(), {
+      person_id,
+      movement_type_id: required(fd, 'movement_type_id', 'el motivo'),
+      movement_date: required(fd, 'movement_date', 'la fecha'),
+      congregation: optStr(fd, 'congregation'),
+      notes: optStr(fd, 'notes'),
+    });
+    revalidatePath('/', 'layout');
+    return 'Registrado.';
+  });
+}
+
+export async function deleteMovementAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  return runAction(async () => {
+    const person_id = required(fd, 'person_id', 'la persona');
+    await movements.deleteMovement(await editor(), required(fd, 'id', 'el registro'));
+    revalidatePath('/', 'layout');
+    return done(person_id, 'Registro eliminado.');
+  });
 }
 
 export async function addRoleAction(_p: ActionState, fd: FormData): Promise<ActionState> {

@@ -4,7 +4,8 @@ import { ActionForm, SubmitButton } from '@/components/ActionForm';
 import { YearSelect } from '@/components/YearSelect';
 import { Empty, PageHeader, Progress, ReadOnlyNote, StatusBadge } from '@/components/ui';
 import { getPersonDetail, today } from '@/lib/services/persons';
-import { listContactTypes, listDateTypes, listGroups, listRoles } from '@/lib/services/catalogs';
+import { listContactTypes, listDateTypes, listGroups, listMovementTypes, listRoles } from '@/lib/services/catalogs';
+import { allowedMovementTypes } from '@/lib/services/movements';
 import { goalCompliance } from '@/lib/services/metrics';
 import { getSession } from '@/lib/services/session';
 import { ServiceError, check } from '@/lib/services/errors';
@@ -29,7 +30,7 @@ export default async function PersonaPage({ params, searchParams }: {
     if (e instanceof ServiceError) notFound();
     throw e;
   }
-  const [compliance, roleMonths, roles, groups, contactTypes, dateTypes, session] = await Promise.all([
+  const [compliance, roleMonths, roles, groups, contactTypes, dateTypes, movementTypes, session] = await Promise.all([
     goalCompliance(db, sy, { personId: id }),
     db.from('view_hours_role_months').select('year, month, role_code').eq('person_id', id).eq('service_year', sy)
       .then((r) => check(r) as Pick<HoursRoleMonth, 'year' | 'month' | 'role_code'>[]),
@@ -37,9 +38,12 @@ export default async function PersonaPage({ params, searchParams }: {
     listGroups(db, { onlyActive: true }),
     listContactTypes(db),
     listDateTypes(db),
+    listMovementTypes(db, { onlyActive: true }),
     getSession(),
   ]);
-  const { person: p, reports } = detail;
+  const { person: p, reports, movements } = detail;
+  const lastMovement = movements[0];
+  const nextTypes = allowedMovementTypes(movementTypes, p.is_active);
   const canEdit = !!session?.canEdit;
   const months = serviceYearMonths(sy);
   const reportOf = new Map(reports.map((r) => [periodKey(r), r]));
@@ -50,7 +54,11 @@ export default async function PersonaPage({ params, searchParams }: {
   return (
     <>
       <PageHeader title={`${p.first_name} ${p.last_name}`}>
-        {!p.is_active ? <span className="badge badge-muted">Inactiva</span> : null}
+        {!p.is_active ? (
+          <span className="badge badge-muted">
+            Inactiva{lastMovement ? ` desde ${fmtDate(lastMovement.movement_date)} · ${lastMovement.type_name}` : ''}
+          </span>
+        ) : null}
         <YearSelect value={sy} options={years} />
       </PageHeader>
       {!canEdit ? <ReadOnlyNote /> : null}
@@ -107,6 +115,53 @@ export default async function PersonaPage({ params, searchParams }: {
             </ActionForm>
           ) : null}
         </div>
+      </section>
+
+      <section className="card">
+        <h2>Altas, bajas y traslados</h2>
+        {movements.length === 0 ? <Empty>Sin altas ni bajas registradas: cuenta como miembro en todos los meses.</Empty> : (
+          <table className="table">
+            <thead><tr><th>Fecha</th><th>Movimiento</th><th>Congregación</th><th>Notas</th><th></th></tr></thead>
+            <tbody>
+              {movements.map((m) => (
+                <tr key={m.id}>
+                  <td>{fmtDate(m.movement_date)}</td>
+                  <td><span className={`badge ${m.direction === 'ALTA' ? 'badge-ok' : 'badge-muted'}`}>{m.direction === 'ALTA' ? 'Alta' : 'Baja'}</span> {m.type_name}</td>
+                  <td>{m.congregation ?? '—'}</td>
+                  <td>{m.notes}</td>
+                  <td>{canEdit ? (
+                    <ActionForm action={A.deleteMovementAction}
+                      confirm="¿Eliminar este registro? Úsalo solo para corregir errores. Los cargos y el grupo que cerró una baja no se reabren.">
+                      <input type="hidden" name="person_id" value={id} /><input type="hidden" name="id" value={m.id} />
+                      <SubmitButton className="btn-link danger" pendingText="…">Eliminar</SubmitButton>
+                    </ActionForm>
+                  ) : null}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {canEdit ? (
+          <>
+            <ActionForm action={A.addMovementAction} className="inline-form" resetOnSuccess
+              confirm={p.is_active ? '¿Registrar la baja? Se cerrarán el cargo y el grupo vigentes el día anterior a la fecha.' : undefined}>
+              <input type="hidden" name="person_id" value={id} />
+              <select name="movement_type_id" required defaultValue="" aria-label="Motivo">
+                <option value="" disabled>{p.is_active ? 'Motivo de la baja…' : 'Motivo del alta…'}</option>
+                {nextTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+              <label className="inline">Fecha <input type="date" name="movement_date" required defaultValue={today()} max={today()} /></label>
+              <input name="congregation" placeholder={p.is_active ? 'Congregación de destino' : 'Congregación de origen'} aria-label="Congregación" />
+              <input name="notes" placeholder="Notas" aria-label="Notas" />
+              <SubmitButton className="btn-secondary">{p.is_active ? 'Registrar baja' : 'Registrar alta'}</SubmitButton>
+            </ActionForm>
+            <p className="muted small">
+              La fecha de una baja es el primer día en que ya no pertenece. Desde ese mes deja de contar en
+              métricas e informes (el mes de la baja cuenta si estuvo al menos un día). La congregación es
+              obligatoria en los traslados.
+            </p>
+          </>
+        ) : null}
       </section>
 
       <section className="card">
@@ -256,7 +311,7 @@ export default async function PersonaPage({ params, searchParams }: {
         </ActionForm>
         {canEdit ? (
           <ActionForm action={A.deletePersonAction} className="danger-zone"
-            confirm="¿Eliminar a esta persona con todo su historial e informes? Si solo dejó de participar, márcala como inactiva.">
+            confirm="¿Eliminar a esta persona? Solo se puede si se capturó por error y no tiene informes, cargos, grupos ni altas/bajas. Si dejó la congregación, registra una baja.">
             <input type="hidden" name="id" value={id} />
             <SubmitButton className="btn-link danger" pendingText="Eliminando…">Eliminar persona</SubmitButton>
           </ActionForm>
