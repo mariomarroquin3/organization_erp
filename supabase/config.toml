@@ -1,0 +1,5 @@
+# Configuración mínima; la CLI completa el resto con valores por defecto.
+project_id = "erp-javier"
+
+[db]
+major_version = 15
