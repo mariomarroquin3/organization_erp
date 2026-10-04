@@ -1,0 +1,22 @@
+import type { Db } from '@/lib/supabase/server';
+import { goalCompliance, monthlySummary, personsOverview, reportMatrix, serviceYearSummary } from '@/lib/services/metrics';
+import {
+  REPORT_KEYS, complianceTable, completenessTable, matrixTable, monthlyTable, personsTable,
+  type ReportKey, type ReportTable,
+} from './tables';
+
+export async function buildTable(db: Db, key: ReportKey, sy: number): Promise<ReportTable> {
+  switch (key) {
+    case 'cumplimiento': return complianceTable(await goalCompliance(db, sy), sy);
+    case 'completitud': return completenessTable(await serviceYearSummary(db, sy), sy);
+    case 'matriz': return matrixTable(await reportMatrix(db, sy), sy);
+    case 'mensual': return monthlyTable(await monthlySummary(db, sy), sy);
+    case 'personas': return personsTable(await personsOverview(db));
+  }
+}
+
+/** 'todo' arma un solo archivo con todos los informes. */
+export async function buildTables(db: Db, key: ReportKey | 'todo', sy: number) {
+  const keys = key === 'todo' ? REPORT_KEYS : [key];
+  return Promise.all(keys.map((k) => buildTable(db, k, sy)));
+}

@@ -1,0 +1,154 @@
+import type { Db } from '@/lib/supabase/server';
+import type {
+  Person, PersonOverview, RoleHistoryRow, GroupHistoryRow, PersonContact, PersonDate, MonthlyReport,
+} from '@/lib/types';
+import { check, ServiceError } from './errors';
+
+export interface PersonFilters {
+  q?: string;
+  groupId?: string;
+  role?: string;          // código de cargo actual, o 'NINGUNO'
+  status?: 'activos' | 'inactivos' | 'todos';
+}
+
+export async function listPersons(db: Db, f: PersonFilters = {}) {
+  let q = db.from('view_persons_overview').select('*').order('last_name').order('first_name');
+  const status = f.status ?? 'activos';
+  if (status !== 'todos') q = q.eq('is_active', status === 'activos');
+  if (f.groupId) q = q.eq('group_id', f.groupId);
+  let rows = check(await q) as PersonOverview[];
+
+  // Filtros de texto y cargo en memoria: la lista es de decenas o pocos
+  // cientos de personas y así se evita escapar patrones en PostgREST.
+  if (f.q) {
+    const needle = normalize(f.q);
+    rows = rows.filter((p) => normalize(`${p.first_name} ${p.last_name}`).includes(needle));
+  }
+  if (f.role === 'NINGUNO') rows = rows.filter((p) => !p.current_roles);
+  else if (f.role) rows = rows.filter((p) => (p.current_roles ?? '').split(', ').includes(f.role!));
+  return rows;
+}
+
+function normalize(s: string) {
+  return s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+}
+
+export async function getPerson(db: Db, id: string) {
+  const p = check(await db.from('persons')
+    .select('id, first_name, last_name, birth_date, is_active, notes').eq('id', id).maybeSingle()) as Person | null;
+  if (!p) throw new ServiceError('La persona no existe.');
+  return p;
+}
+
+export async function getPersonDetail(db: Db, id: string, serviceYear: number) {
+  const [person, roles, groups, contacts, dates, reports] = await Promise.all([
+    getPerson(db, id),
+    db.from('view_role_history').select('*').eq('person_id', id).order('start_date', { ascending: false }),
+    db.from('person_group_history').select('id, person_id, group_id, start_date, end_date, catalog_groups(name)')
+      .eq('person_id', id).order('start_date', { ascending: false }),
+    db.from('person_contacts').select('id, person_id, contact_type_id, value, is_primary, catalog_contact_types(name)')
+      .eq('person_id', id).order('is_primary', { ascending: false }),
+    db.from('person_dates').select('id, person_id, date_type_id, date_value, catalog_date_types(name)')
+      .eq('person_id', id).order('date_value'),
+    db.from('monthly_reports').select('id, person_id, year, month, participated, hours, notes, service_year')
+      .eq('person_id', id).eq('service_year', serviceYear).order('year').order('month'),
+  ]);
+  return {
+    person,
+    roles: check(roles) as RoleHistoryRow[],
+    groups: check(groups) as unknown as GroupHistoryRow[],
+    contacts: check(contacts) as unknown as PersonContact[],
+    dates: check(dates) as unknown as PersonDate[],
+    reports: check(reports) as MonthlyReport[],
+  };
+}
+
+export interface PersonInput {
+  first_name: string; last_name: string; birth_date: string | null; is_active: boolean; notes: string | null;
+}
+
+export async function createPerson(db: Db, input: PersonInput & { group_id?: string | null; start_date?: string }) {
+  const { group_id, start_date, ...row } = input;
+  const created = check(await db.from('persons').insert(row).select('id').single()) as { id: string };
+  if (group_id) {
+    await addGroupPeriod(db, { person_id: created.id, group_id, start_date: start_date ?? today(), end_date: null });
+  }
+  return created.id;
+}
+
+export async function updatePerson(db: Db, id: string, input: PersonInput) {
+  check(await db.from('persons').update(input).eq('id', id));
+}
+
+export async function deletePerson(db: Db, id: string) {
+  check(await db.from('persons').delete().eq('id', id));
+}
+
+// ---- Cargos ----------------------------------------------------------
+
+export async function addRolePeriod(db: Db, r: { person_id: string; role_id: string; start_date: string; end_date: string | null; notes?: string | null }) {
+  check(await db.from('person_roles').insert(r));
+}
+
+export async function closeRolePeriod(db: Db, id: string, end_date: string) {
+  check(await db.from('person_roles').update({ end_date }).eq('id', id));
+}
+
+export async function deleteRolePeriod(db: Db, id: string) {
+  check(await db.from('person_roles').delete().eq('id', id));
+}
+
+// ---- Grupos ----------------------------------------------------------
+
+/**
+ * Asigna un grupo desde una fecha. Si la persona tiene un grupo abierto
+ * que empezó antes, se cierra el día anterior (cambio de grupo).
+ */
+export async function addGroupPeriod(db: Db, g: { person_id: string; group_id: string; start_date: string; end_date: string | null }) {
+  const open = check(await db.from('person_group_history').select('id, start_date')
+    .eq('person_id', g.person_id).is('end_date', null)) as { id: string; start_date: string }[];
+  for (const o of open) {
+    if (o.start_date < g.start_date) {
+      check(await db.from('person_group_history').update({ end_date: dayBefore(g.start_date) }).eq('id', o.id));
+    }
+  }
+  check(await db.from('person_group_history').insert(g));
+}
+
+export async function closeGroupPeriod(db: Db, id: string, end_date: string) {
+  check(await db.from('person_group_history').update({ end_date }).eq('id', id));
+}
+
+export async function deleteGroupPeriod(db: Db, id: string) {
+  check(await db.from('person_group_history').delete().eq('id', id));
+}
+
+// ---- Contactos y fechas ------------------------------------------------
+
+export async function addContact(db: Db, c: { person_id: string; contact_type_id: string; value: string; is_primary: boolean }) {
+  check(await db.from('person_contacts').insert(c));
+}
+
+export async function deleteContact(db: Db, id: string) {
+  check(await db.from('person_contacts').delete().eq('id', id));
+}
+
+export async function setDate(db: Db, d: { person_id: string; date_type_id: string; date_value: string }) {
+  check(await db.from('person_dates').upsert(d, { onConflict: 'person_id,date_type_id' }));
+}
+
+export async function deleteDate(db: Db, id: string) {
+  check(await db.from('person_dates').delete().eq('id', id));
+}
+
+// ---- utilidades --------------------------------------------------------
+
+export function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export function dayBefore(isoDate: string): string {
+  const d = new Date(`${isoDate}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}

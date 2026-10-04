@@ -1,12 +1,13 @@
 # ERP de gestión de personal (Javier)
 
-Base de datos en Supabase (PostgreSQL) para gestionar personas, grupos, cargos (PR, PA y otros), informes mensuales, metas anuales de horas por año de servicio (sep-ago) y métricas de cumplimiento y completitud.
+Aplicación web (Next.js) sobre una base de datos en Supabase (PostgreSQL) para gestionar personas, grupos, cargos (PR, PA y otros), informes mensuales, metas anuales de horas por año de servicio (sep-ago), métricas de cumplimiento y completitud, e informes en Excel y PDF.
 
 El diseño y sus decisiones están en [`docs/MODELO_DATOS.md`](docs/MODELO_DATOS.md).
 
 ## Estructura
 
 ```
+web/            aplicación (Next.js + supabase-js), ver "Aplicación web"
 supabase/
   migrations/   esquema en orden (núcleo, metas, informes, vistas, seguridad, bitácora, catálogos)
   seed.sql      datos de demostración, solo para desarrollo local
@@ -42,4 +43,54 @@ Solo las pruebas, con cualquier Postgres 15+:
 
 ```bash
 PGHOST=localhost PGUSER=postgres bash tests/run.sh
+```
+
+## Aplicación web (`web/`)
+
+Pantallas:
+
+| Pantalla | Qué hace |
+|---|---|
+| Panel | Personas activas, informes del último mes cerrado, completitud promedio, avance de metas PR/PA y quién va atrasado. |
+| Informes del mes | Hoja de captura mensual: Sí / No / Sin informe para todos y horas para quien era PR o PA ese mes (obligatorias). Guarda solo lo que cambió. |
+| Personas | Listado con filtros; ficha con metas del año, informes mes a mes, cargos, grupos, contactos y fechas. |
+| Métricas | Cumplimiento de metas PR/PA, completitud por persona (con filtro "solo quienes no son PR ni PA") y resumen mensual por grupo. |
+| Exportar | Cada informe en Excel o PDF, o todos juntos en un solo archivo. |
+| Configuración | Metas de horas por cargo y año, grupos, cargos y cuentas de acceso. |
+
+Los permisos los aplica la base (RLS): un Lector puede consultar y exportar; Administrador y Super administrador editan; solo el Super administrador cambia cuentas. La app oculta los controles de edición a quien no puede usarlos.
+
+Código:
+
+```
+web/
+  app/              páginas, acciones de servidor y /api/export
+  lib/services/     capa de servicios: personas, informes, métricas, catálogos, sesión
+  lib/export/       tablas de informes -> Excel (exceljs) y PDF (jsPDF)
+  tests/            pruebas unitarias (vitest)
+```
+
+### Correr en local
+
+```bash
+cd web
+cp .env.example .env.local   # URL y anon key del proyecto (o de `supabase start`)
+npm install
+npm run dev                  # http://localhost:3000
+```
+
+Pruebas: `npm test` (unitarias), `npm run typecheck` y `npm run build`.
+
+### Desplegar
+
+1. Aplica las migraciones en Supabase y crea el primer SUPERADMIN (sección anterior).
+2. En Supabase, Authentication > Providers: deja Email habilitado y desactiva "Allow new users to sign up" para que solo entren las cuentas que crees.
+3. Importa el repositorio en Vercel con **Root Directory = `web`** y define `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+
+Para dar acceso a otra persona: créala en Authentication > Users y registra su cuenta (nivel `ADMIN` o `READER`):
+
+```sql
+insert into app_users (id, system_role_id, display_name, person_id)
+select '<uuid-del-usuario>', id, 'Nombre', null   -- person_id opcional
+from catalog_system_roles where code = 'READER';
 ```
