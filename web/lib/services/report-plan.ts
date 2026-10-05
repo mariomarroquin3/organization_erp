@@ -57,7 +57,8 @@ export function planMonthSave(
       continue;
     }
     if (e.state === '') {
-      if (hours !== null && hours > 0) {
+      if (hours !== null) {
+        // Antes un 0 sin marcar Sí/No se descartaba sin avisar
         plan.errors.push(`${info.name}: tiene horas pero no se marcó si participó.`);
       } else if (prev) {
         plan.deletes.push(prev.id);

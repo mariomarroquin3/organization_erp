@@ -2,7 +2,7 @@ import type { Db } from '@/lib/supabase/server';
 import type {
   Person, PersonOverview, RoleHistoryRow, GroupHistoryRow, PersonContact, PersonDate, MonthlyReport, PersonMovement,
 } from '@/lib/types';
-import { check, ServiceError } from './errors';
+import { check, fetchAll, ServiceError } from './errors';
 import { addMovement, listMovements } from './movements';
 
 export interface PersonFilters {
@@ -13,11 +13,13 @@ export interface PersonFilters {
 }
 
 export async function listPersons(db: Db, f: PersonFilters = {}) {
-  let q = db.from('view_persons_overview').select('*').order('last_name').order('first_name');
   const status = f.status ?? 'activos';
-  if (status !== 'todos') q = q.eq('is_active', status === 'activos');
-  if (f.groupId) q = q.eq('group_id', f.groupId);
-  let rows = check(await q) as PersonOverview[];
+  let rows = await fetchAll<PersonOverview>((from, to) => {
+    let q = db.from('view_persons_overview').select('*').order('last_name').order('first_name').order('person_id');
+    if (status !== 'todos') q = q.eq('is_active', status === 'activos');
+    if (f.groupId) q = q.eq('group_id', f.groupId);
+    return q.range(from, to);
+  });
 
   // Filtros de texto y cargo en memoria: la lista es de decenas o pocos
   // cientos de personas y así se evita escapar patrones en PostgREST.
@@ -168,4 +170,17 @@ export function dayBefore(isoDate: string): string {
   const d = new Date(`${isoDate}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() - 1);
   return d.toISOString().slice(0, 10);
+}
+
+// ---- Reagrupación ------------------------------------------------------
+
+export interface GroupMove { person_id: string; group_id: string | null }
+
+/**
+ * Cambia de grupo a varias personas desde una fecha, en una transacción
+ * (fn_reassign_groups, migración 1000). Los periodos anteriores se cierran
+ * el día antes: los meses pasados conservan su grupo.
+ */
+export async function reassignGroups(db: Db, date: string, moves: GroupMove[], deactivate: string[] = []) {
+  return check(await db.rpc('fn_reassign_groups', { p_date: date, p_moves: moves, p_deactivate: deactivate })) as number;
 }

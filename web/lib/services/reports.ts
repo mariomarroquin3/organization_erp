@@ -1,6 +1,6 @@
 import type { Db } from '@/lib/supabase/server';
 import { periodDate, type YearMonth } from '@/lib/service-year';
-import { check, ServiceError } from './errors';
+import { check, fetchAll, ServiceError } from './errors';
 import { listMembershipPeriods, wasMemberDuring } from './movements';
 import { planMonthSave, type ExistingReport, type PersonInfo, type SheetEntry } from './report-plan';
 
@@ -23,7 +23,8 @@ export async function getMonthSheet(db: Db, ym: YearMonth): Promise<SheetRow[]> 
   const start = periodDate(ym);
   const end = lastDayOfMonth(ym);
   const [persons, groups, roles, reports, periods] = await Promise.all([
-    db.from('persons').select('id, first_name, last_name, is_active').order('last_name').order('first_name'),
+    fetchAll<{ id: string; first_name: string; last_name: string; is_active: boolean }>((from, to) => db.from('persons')
+      .select('id, first_name, last_name, is_active').order('last_name').order('first_name').order('id').range(from, to)),
     db.from('person_group_history').select('person_id, start_date, catalog_groups(name)')
       .lte('start_date', end).or(`end_date.is.null,end_date.gte.${start}`)
       .order('start_date', { ascending: false }),
@@ -41,7 +42,7 @@ export async function getMonthSheet(db: Db, ym: YearMonth): Promise<SheetRow[]> 
   const roleOf = new Map((check(roles) as { person_id: string; role_code: string }[]).map((r) => [r.person_id, r.role_code]));
   const reportOf = new Map((check(reports) as ExistingReport[]).map((r) => [r.person_id, r]));
 
-  return (check(persons) as { id: string; first_name: string; last_name: string; is_active: boolean }[])
+  return persons
     .filter((p) => reportOf.has(p.id) || wasMemberDuring(periodsOf.get(p.id) ?? [], start, end))
     .map((p) => ({
       person_id: p.id,
