@@ -27,6 +27,10 @@ El cargo de cada mes se deduce del historial (`person_roles`), así que alguien 
 - `view_membership_periods` da los periodos de pertenencia. Un mes cuenta para métricas e informes si la persona fue miembro al menos un día de ese mes; los meses con informe se muestran siempre.
 - Borrado lógico: no se puede borrar a una persona con informes, cargos, grupos o altas/bajas, y sus FKs ya no borran en cascada. Solo se borra a alguien capturado por error sin historial.
 
+**Grupos y reagrupaciones.** El grupo de cada mes sale de `person_group_history`, y el cumplimiento de metas es por persona, no por grupo. Por eso cambiar a alguien de grupo o disolver un grupo no altera nada de los meses anteriores. Un grupo que desaparece se desactiva (no se borra) y conserva su historial. Cambiar el nombre de un grupo sí cambia cómo aparece en los informes pasados: es solo para corregir.
+
+**Cargos sin horas: A, SM, PB, PNB.** Nombramientos largos con historial por periodos. Regla del bautismo (trigger `check_baptism_rule`): al registrar PB, un PNB vigente se cierra el día anterior; nadie puede tener un PNB que termine en o después de su primer PB.
+
 **Mes cerrado.** Cualquier mes anterior al mes en curso. Las métricas "a la fecha" y la completitud se calculan sobre meses cerrados.
 
 ## Tablas
@@ -59,6 +63,7 @@ Todas las vistas usan `security_invoker`, así que respetan el RLS (en el origin
 | `fn_report_matrix(año)` | Matriz persona × mes: informó, participó, horas, cargo y grupo de ese mes. Base de la exportación a Excel. |
 | `fn_service_year_summary(año)` | **Completitud** por persona: meses esperados, informados, con participación y porcentajes. Es la métrica de quien no es PR ni PA. |
 | `fn_monthly_summary(año)` | Resumen de la organización por mes y grupo. |
+| `fn_reassign_groups(fecha, cambios, grupos_a_desactivar)` | Reagrupación (migración 1000): cambia de grupo a varias personas desde una fecha en una transacción y desactiva los grupos que desaparecen. Los periodos anteriores se cierran el día antes, así que los meses pasados conservan su grupo. Un grupo con personas no se puede desactivar. |
 | `fn_import_persons(filas)` | Alta masiva desde Excel (migración 0900): persona, alta, grupo, cargos y contactos de varias filas en una sola transacción; si una fila falla no se guarda ninguna y el error indica la fila. |
 
 Desde el cliente: `supabase.from('view_goal_compliance').select().eq('service_year', 2026)` y `supabase.rpc('fn_service_year_summary', { p_service_year: 2026 })`.

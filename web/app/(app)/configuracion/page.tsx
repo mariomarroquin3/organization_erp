@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { ActionForm, SubmitButton } from '@/components/ActionForm';
 import { Empty, PageHeader, ReadOnlyNote } from '@/components/ui';
 import { createClient } from '@/lib/supabase/server';
@@ -96,6 +97,11 @@ export default async function ConfiguracionPage() {
               <SubmitButton className="btn-secondary">Agregar</SubmitButton>
             </ActionForm>
           ) : null}
+          <p className="muted small">
+            Para mover personas entre grupos o disolver un grupo usa <Link href="/personas/reagrupar">Reagrupar</Link>; un grupo
+            solo se puede desactivar cuando ya no tiene personas. El historial de cada mes conserva el grupo de entonces.
+            Cambiar el nombre de un grupo también lo cambia en los informes pasados: úsalo solo para corregir.
+          </p>
         </div>
 
         <div className="card">
@@ -131,7 +137,7 @@ export default async function ConfiguracionPage() {
               <SubmitButton className="btn-secondary">Agregar</SubmitButton>
             </ActionForm>
           ) : null}
-          <p className="muted small">Las métricas dependen de los códigos exactos PR y PA: no los cambies.</p>
+          <p className="muted small">Las métricas dependen de los códigos exactos PR y PA, y la regla del bautismo de PB y PNB: no los cambies. Quien recibe PB deja de ser PNB el día anterior y no puede volver a serlo.</p>
         </div>
       </section>
 

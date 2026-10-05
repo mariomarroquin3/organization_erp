@@ -2,7 +2,7 @@ import type { Db } from '@/lib/supabase/server';
 import type {
   ComplianceStatus, GoalCompliance, MonthlySummary, PersonOverview, ReportMatrixRow, ServiceYearSummary,
 } from '@/lib/types';
-import { check } from './errors';
+import { check, fetchAll } from './errors';
 
 // Las métricas se calculan en la base (vistas y funciones de la
 // migración 0400). Aquí solo se piden y se resumen para el panel.
@@ -25,12 +25,13 @@ export async function monthlySummary(db: Db, serviceYear: number) {
 }
 
 export async function reportMatrix(db: Db, serviceYear: number) {
-  return check(await db.rpc('fn_report_matrix', { p_service_year: serviceYear })) as ReportMatrixRow[];
+  return fetchAll<ReportMatrixRow>((from, to) => db.rpc('fn_report_matrix', { p_service_year: serviceYear })
+    .order('last_name').order('first_name').order('person_id').order('period').range(from, to));
 }
 
 export async function personsOverview(db: Db) {
-  return check(await db.from('view_persons_overview').select('*')
-    .order('last_name').order('first_name')) as PersonOverview[];
+  return fetchAll<PersonOverview>((from, to) => db.from('view_persons_overview').select('*')
+    .order('last_name').order('first_name').order('person_id').range(from, to));
 }
 
 /** Personas sin cargo PR ni PA: su métrica es la completitud sí/no. */

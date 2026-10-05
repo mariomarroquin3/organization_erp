@@ -237,7 +237,10 @@ export function validateRows(
     if (groupName && !group) msgs.push(`El grupo "${groupName}" no existe o está inactivo.`);
 
     // Cargos
-    const roleTokens = text(v.roles).split(/[,;/]+|\s+y\s+|\s+/).map((t) => t.trim()).filter(Boolean);
+    // Separados por coma, punto y coma, barra o " y "; si un trozo no es un
+    // cargo (por nombre, que puede llevar espacios), se prueba palabra por palabra
+    const roleTokens = text(v.roles).split(/[,;/]+|\s+y\s+/i).map((t) => t.trim()).filter(Boolean)
+      .flatMap((t) => (roles.has(normalize(t)) ? [t] : t.split(/\s+/)));
     const roleList: CatalogRole[] = [];
     for (const t of roleTokens) {
       const r = roles.get(normalize(t));
@@ -246,6 +249,10 @@ export function validateRows(
     }
     if (roleList.filter((r) => r.requires_hours_report).length > 1) {
       msgs.push(`No puede tener ${roleList.filter((r) => r.requires_hours_report).map((r) => r.code).join(' y ')} a la vez.`);
+    }
+
+    if (roleList.some((r) => r.code === 'PB') && roleList.some((r) => r.code === 'PNB')) {
+      msgs.push('No puede ser PB y PNB a la vez.');
     }
 
     // Alta

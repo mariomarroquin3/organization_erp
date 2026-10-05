@@ -26,3 +26,21 @@ export function check<T>(res: { data: T | null; error: PostgrestError | null }):
   if (res.error) throw new ServiceError(friendlyDbError(res.error));
   return res.data as T;
 }
+
+/**
+ * Lee todas las filas de una consulta en páginas. Supabase devuelve como
+ * máximo 1000 filas por petición (ajuste "Max rows" del API) y corta el
+ * resto sin avisar; la matriz persona x mes, por ejemplo, pasa de 1000
+ * filas con unas 84 personas. La consulta debe tener un orden estable.
+ */
+export async function fetchAll<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: PostgrestError | null }>,
+  size = 1000,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += size) {
+    const rows = check(await page(from, from + size - 1)) ?? [];
+    out.push(...rows);
+    if (rows.length < size) return out;
+  }
+}
