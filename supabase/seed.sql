@@ -7,6 +7,7 @@
 --           PA: 200/150 CUMPLIDA · PR: 280/350 NO CUMPLIDA
 --   Carla : solo PB, informa sí/no; 10 de 12 meses; cambia de grupo en marzo
 --   Diego : sin cargo, informa 6 meses
+-- Cursos bíblicos: Ana 2 cada mes; Carla 1 en septiembre; el resto 0.
 -- =====================================================================
 
 insert into public.catalog_groups (id, name) values
@@ -50,3 +51,8 @@ union all
 select '00000000-0000-0000-0000-000000000003'::uuid, y, mo, true, null from months where n <= 10
 union all
 select '00000000-0000-0000-0000-000000000004'::uuid, y, mo, (n % 2 = 0), null from months where n <= 6;
+
+update public.monthly_reports set bible_studies = 2
+where person_id = '00000000-0000-0000-0000-000000000001';
+update public.monthly_reports set bible_studies = 1
+where person_id = '00000000-0000-0000-0000-000000000003' and year = 2025 and month = 9;

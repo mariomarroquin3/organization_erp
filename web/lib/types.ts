@@ -49,7 +49,7 @@ export interface PersonDate {
 
 export interface MonthlyReport {
   id: string; person_id: string; year: number; month: number;
-  participated: boolean; hours: number | null; notes: string | null; service_year: number;
+  participated: boolean; hours: number | null; bible_studies: number; notes: string | null; service_year: number;
 }
 
 export interface HoursRoleMonth {
@@ -69,7 +69,7 @@ export interface GoalCompliance {
 export interface ReportMatrixRow {
   person_id: string; first_name: string; last_name: string; group_name: string | null;
   period: string; year: number; month: number; hours_role: string | null;
-  has_report: boolean; participated: boolean; hours: number | null;
+  has_report: boolean; participated: boolean; hours: number | null; bible_studies: number;
 }
 
 export interface ServiceYearSummary {
@@ -82,6 +82,7 @@ export interface ServiceYearSummary {
 export interface MonthlySummary {
   period: string; group_name: string | null; persons: number; reports_received: number;
   participated: number; pct_reported: number | null; hours_role_persons: number; total_hours: number;
+  bible_studies: number;
 }
 
 export interface RoleHourGoal {

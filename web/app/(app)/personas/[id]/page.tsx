@@ -83,7 +83,7 @@ export default async function PersonaPage({ params, searchParams }: {
         <div className="card">
           <h2>Informes del año {sy}</h2>
           <table className="table compact">
-            <thead><tr><th>Mes</th><th>Cargo</th><th>Participó</th><th className="num">Horas</th></tr></thead>
+            <thead><tr><th>Mes</th><th>Cargo</th><th>Participó</th><th className="num">Horas</th><th className="num">Cursos</th></tr></thead>
             <tbody>
               {months.map((m) => {
                 const k = periodKey(m);
@@ -96,6 +96,7 @@ export default async function PersonaPage({ params, searchParams }: {
                     <td>{role ?? '—'}</td>
                     <td>{r ? (r.participated ? 'Sí' : 'No') : <span className="muted">{future ? '' : 'Sin informe'}</span>}</td>
                     <td className="num">{r?.hours ?? ''}</td>
+                    <td className="num">{r ? r.bible_studies : ''}</td>
                   </tr>
                 );
               })}
@@ -111,6 +112,7 @@ export default async function PersonaPage({ params, searchParams }: {
                 <option value="si">Participó</option><option value="no">No participó</option><option value="">Borrar informe</option>
               </select>
               <input name="hours" inputMode="decimal" placeholder="Horas" className="hours" aria-label="Horas" />
+              <input name="studies" inputMode="numeric" placeholder="Cursos" className="hours studies" aria-label="Cursos bíblicos" />
               <SubmitButton className="btn-secondary">Guardar</SubmitButton>
             </ActionForm>
           ) : null}

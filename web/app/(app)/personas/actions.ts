@@ -200,7 +200,7 @@ export async function saveReportAction(_p: ActionState, fd: FormData): Promise<A
     const ym = parsePeriodKey(str(fd, 'mes'));
     if (!ym) throw new ServiceError('Elige el mes.');
     const state = str(fd, 'state') as ReportState;
-    const res = await savePersonMonth(await editor(), person_id, ym, { state, hours: str(fd, 'hours') });
+    const res = await savePersonMonth(await editor(), person_id, ym, { state, hours: str(fd, 'hours'), studies: str(fd, 'studies') });
     revalidatePath('/', 'layout');
     return res.saved || res.deleted ? 'Informe guardado.' : 'Sin cambios.';
   });

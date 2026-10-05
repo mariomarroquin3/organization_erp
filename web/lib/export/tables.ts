@@ -84,23 +84,32 @@ export function completenessTable(rows: ServiceYearSummary[], sy: number): Repor
   };
 }
 
-/** Celda de la matriz: horas para PR/PA, Sí/No para el resto, vacío si no informó. */
-export function matrixCell(r: Pick<ReportMatrixRow, 'has_report' | 'participated' | 'hours' | 'hours_role'>): Cell {
+/**
+ * Celda de la matriz: horas para PR/PA, Sí/No para el resto, vacío si no
+ * informó. Si informó cursos bíblicos se agregan como "· 2 c.".
+ */
+export function matrixCell(
+  r: Pick<ReportMatrixRow, 'has_report' | 'participated' | 'hours' | 'hours_role'> & { bible_studies?: number | null },
+): Cell {
   if (!r.has_report) return r.hours_role ? 'Falta' : '—';
-  if (r.hours_role || (r.hours !== null && Number(r.hours) > 0)) return Number(r.hours ?? 0);
-  return r.participated ? 'Sí' : 'No';
+  const base = r.hours_role || (r.hours !== null && Number(r.hours) > 0) ? Number(r.hours ?? 0) : r.participated ? 'Sí' : 'No';
+  const studies = Number(r.bible_studies ?? 0);
+  return studies > 0 ? `${base} · ${studies} c.` : base;
 }
 
 export function matrixTable(rows: ReportMatrixRow[], sy: number): ReportTable {
   const months = serviceYearMonths(sy);
   const keyOf = (y: number, m: number) => y * 100 + m;
-  const people = new Map<string, { last: string; first: string; group: string | null; roles: Set<string>; cells: Map<number, Cell>; hours: number }>();
+  const people = new Map<string, {
+    last: string; first: string; group: string | null; roles: Set<string>; cells: Map<number, Cell>; hours: number; studies: number;
+  }>();
   for (const r of rows) {
-    const p = people.get(r.person_id) ?? { last: r.last_name, first: r.first_name, group: null, roles: new Set<string>(), cells: new Map(), hours: 0 };
+    const p = people.get(r.person_id) ?? { last: r.last_name, first: r.first_name, group: null, roles: new Set<string>(), cells: new Map(), hours: 0, studies: 0 };
     p.group = r.group_name ?? p.group; // grupo del último mes con dato
     if (r.hours_role) p.roles.add(r.hours_role);
     p.cells.set(keyOf(r.year, r.month), matrixCell(r));
     p.hours += Number(r.hours ?? 0);
+    p.studies = Math.max(p.studies, Number(r.bible_studies ?? 0));
     people.set(r.person_id, p);
   }
   return {
@@ -113,14 +122,16 @@ export function matrixTable(rows: ReportMatrixRow[], sy: number): ReportTable {
       { header: 'PR/PA', width: 7 },
       ...months.map((m) => ({ header: `${MONTH_SHORT[m.month - 1]} ${String(m.year).slice(2)}`, width: 7 })),
       { header: 'Total h', format: 'num' as const },
+      { header: 'Cursos (máx./mes)', format: 'num' as const },
     ],
     rows: [...people.values()].map((p) => [
       p.last, p.first, p.group, [...p.roles].sort().join('/') || null,
       ...months.map((m) => p.cells.get(keyOf(m.year, m.month)) ?? null),
       p.hours,
+      p.studies,
     ]),
     notes: [
-      '"Falta": era PR/PA ese mes y no hay informe. "—": no informó.',
+      '"Falta": era PR/PA ese mes y no hay informe. "—": no informó. "· 2 c.": cursos bíblicos informados ese mes.',
       'Celda vacía: el mes aún no cierra o la persona no era miembro ese mes (antes de su alta o después de su baja).',
     ],
   };
@@ -136,12 +147,14 @@ export function monthlyTable(rows: MonthlySummary[], sy: number): ReportTable {
       { header: 'Personas', format: 'num' }, { header: 'Informes', format: 'num' },
       { header: 'Participaron', format: 'num' }, { header: '% informado', format: 'pct' },
       { header: 'PR/PA', format: 'num' }, { header: 'Horas', format: 'num' },
+      { header: 'Cursos bíblicos', format: 'num' },
     ],
     rows: rows.map((r) => {
       const [y, m] = r.period.split('-').map(Number);
       return [
         `${MONTH_SHORT[m - 1]} ${y}`, r.group_name ?? 'Sin grupo', r.persons, r.reports_received,
         r.participated, n(r.pct_reported), r.hours_role_persons, n(r.total_hours),
+        Number(r.bible_studies ?? 0),
       ];
     }),
   };

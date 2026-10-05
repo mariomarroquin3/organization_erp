@@ -5,11 +5,15 @@ import { FormMessage, PendingProvider, SubmitButton, useFormAction } from '@/com
 import type { SheetRow } from '@/lib/services/reports';
 import { saveSheetAction } from './actions';
 
-type RowState = { state: '' | 'si' | 'no'; hours: string };
+type RowState = { state: '' | 'si' | 'no'; hours: string; studies: string };
 
 function initial(r: SheetRow): RowState {
-  if (!r.report) return { state: '', hours: '' };
-  return { state: r.report.participated ? 'si' : 'no', hours: r.report.hours === null ? '' : String(r.report.hours) };
+  if (!r.report) return { state: '', hours: '', studies: '' };
+  return {
+    state: r.report.participated ? 'si' : 'no',
+    hours: r.report.hours === null ? '' : String(r.report.hours),
+    studies: r.report.bible_studies ? String(r.report.bible_studies) : '',
+  };
 }
 
 export function MonthSheet({ rows, mes, canEdit, anio }: { rows: SheetRow[]; mes: string; canEdit: boolean; anio: number }) {
@@ -67,7 +71,7 @@ export function MonthSheet({ rows, mes, canEdit, anio }: { rows: SheetRow[]; mes
 
         <table className="table sheet">
           <thead>
-            <tr><th>Persona</th><th>Grupo</th><th>Cargo del mes</th><th>¿Participó?</th><th className="num">Horas</th></tr>
+            <tr><th>Persona</th><th>Grupo</th><th>Cargo del mes</th><th>¿Participó?</th><th className="num">Horas</th><th className="num" title="Cursos bíblicos (vacío = 0)">Cursos</th></tr>
           </thead>
           <tbody>
             {rows.map((r) => {
@@ -101,6 +105,17 @@ export function MonthSheet({ rows, mes, canEdit, anio }: { rows: SheetRow[]; mes
                         const hours = e.target.value;
                         // Escribir horas > 0 implica que participó
                         set(r.person_id, Number(hours.replace(',', '.')) > 0 ? { hours, state: 'si' } : { hours });
+                      }}
+                    />
+                  </td>
+                  <td className="num">
+                    <input
+                      name={`studies_${r.person_id}`} inputMode="numeric" className="hours studies"
+                      value={v.studies} disabled={!canEdit} placeholder="0" aria-label={`Cursos bíblicos ${r.first_name}`}
+                      onChange={(e) => {
+                        const studies = e.target.value;
+                        // Informar cursos implica que participó
+                        set(r.person_id, Number(studies) > 0 ? { studies, state: 'si' } : { studies });
                       }}
                     />
                   </td>

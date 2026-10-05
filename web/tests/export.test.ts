@@ -20,7 +20,7 @@ const summary: ServiceYearSummary[] = [{
 function m(person: string, year: number, month: number, o: Partial<ReportMatrixRow>): ReportMatrixRow {
   return {
     person_id: person, first_name: person, last_name: person.toUpperCase(), group_name: 'G', period: `${year}-${String(month).padStart(2, '0')}-01`,
-    year, month, hours_role: null, has_report: false, participated: false, hours: null, ...o,
+    year, month, hours_role: null, has_report: false, participated: false, hours: null, bible_studies: 0, ...o,
   };
 }
 
@@ -34,21 +34,29 @@ describe('celdas de la matriz', () => {
     expect(matrixCell({ has_report: false, participated: false, hours: null, hours_role: null })).toBe('—');
   });
 
+  it('agrega los cursos bíblicos cuando hay', () => {
+    expect(matrixCell({ has_report: true, participated: true, hours: 40, hours_role: 'PR', bible_studies: 2 })).toBe('40 · 2 c.');
+    expect(matrixCell({ has_report: true, participated: true, hours: null, hours_role: null, bible_studies: 1 })).toBe('Sí · 1 c.');
+    expect(matrixCell({ has_report: true, participated: true, hours: null, hours_role: null, bible_studies: 0 })).toBe('Sí');
+  });
+
   it('pivota a una fila por persona con 12 meses sep-ago', () => {
     const t = matrixTable([
       m('ana', 2025, 9, { hours_role: 'PR', has_report: true, participated: true, hours: 50 }),
       m('ana', 2025, 10, { hours_role: 'PR' }),
-      m('carla', 2025, 9, { has_report: true, participated: true }),
+      m('carla', 2025, 9, { has_report: true, participated: true, bible_studies: 1 }),
     ], 2026);
-    expect(t.columns).toHaveLength(4 + 12 + 1);
+    expect(t.columns).toHaveLength(4 + 12 + 2);
     expect(t.columns[4].header).toBe('sep 25');
     expect(t.columns[15].header).toBe('ago 26');
     const ana = t.rows.find((r) => r[0] === 'ANA')!;
     expect(ana.slice(3, 6)).toEqual(['PR', 50, 'Falta']);
-    expect(ana.at(-1)).toBe(50);
+    expect(ana.at(-2)).toBe(50);
+    expect(ana.at(-1)).toBe(0);
     const carla = t.rows.find((r) => r[0] === 'CARLA')!;
     expect(carla[3]).toBeNull();
-    expect(carla[4]).toBe('Sí');
+    expect(carla[4]).toBe('Sí · 1 c.');
+    expect(carla.at(-1)).toBe(1);
   });
 });
 

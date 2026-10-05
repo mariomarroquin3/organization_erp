@@ -29,7 +29,7 @@ export async function getMonthSheet(db: Db, ym: YearMonth): Promise<SheetRow[]> 
       .lte('start_date', end).or(`end_date.is.null,end_date.gte.${start}`)
       .order('start_date', { ascending: false }),
     db.from('view_hours_role_months').select('person_id, role_code').eq('period', start),
-    db.from('monthly_reports').select('id, person_id, participated, hours').eq('year', ym.year).eq('month', ym.month),
+    db.from('monthly_reports').select('id, person_id, participated, hours, bible_studies').eq('year', ym.year).eq('month', ym.month),
     listMembershipPeriods(db),
   ]);
   const periodsOf = new Map<string, typeof periods>();

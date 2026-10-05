@@ -12,9 +12,9 @@ function gc(id: string, role: string, status: GoalCompliance['status'], hours: n
     pct_goal: null, pct_to_date: null, hours_needed_per_month: null, status,
   };
 }
-const ms = (period: string, group: string | null, persons: number, received: number, hours: number): MonthlySummary => ({
+const ms = (period: string, group: string | null, persons: number, received: number, hours: number, studies = 0): MonthlySummary => ({
   period, group_name: group, persons, reports_received: received, participated: received,
-  pct_reported: null, hours_role_persons: 0, total_hours: hours,
+  pct_reported: null, hours_role_persons: 0, total_hours: hours, bible_studies: studies,
 });
 const mv = (direction: 'ALTA' | 'BAJA') => ({ direction } as PersonMovement);
 
@@ -30,7 +30,7 @@ describe('meses cerrados del año de servicio', () => {
 describe('resumen del año', () => {
   const data = {
     compliance: [gc('a', 'PR', 'CUMPLIDA', 610, 600), gc('b', 'PR', 'NO CUMPLIDA', 500, 600), gc('c', 'PA', 'CUMPLIDA', 90, 90)],
-    monthly: [ms('2025-09-01', 'Norte', 3, 3, 100), ms('2025-09-01', null, 1, 0, 0), ms('2025-10-01', 'Norte', 3, 2, 80)],
+    monthly: [ms('2025-09-01', 'Norte', 3, 3, 100, 2), ms('2025-09-01', null, 1, 0, 0), ms('2025-10-01', 'Norte', 3, 2, 80, 3)],
     movements: [mv('ALTA'), mv('ALTA'), mv('BAJA')],
   };
 
@@ -43,7 +43,10 @@ describe('resumen del año', () => {
     expect(yearStatusText(o)).toContain('Año cerrado el 31/08/2026');
     const t = annualSummaryTable(o);
     expect(t.rows.find((r) => r[0] === 'PR: resultado')![1]).toBe('1 cumplieron, 1 no cumplieron');
-    expect(groupTotalsTable(o).rows.at(-1)).toEqual(['Total', 7, 5, 71.4, 5, 180]);
+    // Cursos: 2 en sep + 3 en oct = 5 en 2 meses -> 2.5 por mes
+    expect(o.studiesAvg).toBe(2.5);
+    expect(t.rows.find((r) => r[0] === 'Cursos bíblicos (promedio por mes)')![1]).toMatch(/^2[.,]5$/);
+    expect(groupTotalsTable(o).rows.at(-1)).toEqual(['Total', 7, 5, 71.4, 5, 180, 2.5]);
   });
 
   it('año en curso: recuerda que las horas de PR cierran el 31 de agosto', () => {

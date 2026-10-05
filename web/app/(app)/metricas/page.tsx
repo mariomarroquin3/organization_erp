@@ -131,7 +131,7 @@ async function Monthly({ db, sy }: { db: Db; sy: number }) {
       {rows.length === 0 ? <Empty>Aún no hay meses cerrados en este año de servicio.</Empty> : (
         <table className="table">
           <thead>
-            <tr><th>Mes</th><th>Grupo</th><th className="num">Personas</th><th className="num">Informes</th><th>% informado</th><th className="num">Participaron</th><th className="num">PR/PA</th><th className="num">Horas</th></tr>
+            <tr><th>Mes</th><th>Grupo</th><th className="num">Personas</th><th className="num">Informes</th><th>% informado</th><th className="num">Participaron</th><th className="num">PR/PA</th><th className="num">Horas</th><th className="num">Cursos</th></tr>
           </thead>
           <tbody>
             {rows.map((r) => {
@@ -146,6 +146,7 @@ async function Monthly({ db, sy }: { db: Db; sy: number }) {
                   <td className="num">{r.participated}</td>
                   <td className="num">{r.hours_role_persons}</td>
                   <td className="num">{fmtNum(r.total_hours)}</td>
+                  <td className="num">{r.bible_studies}</td>
                 </tr>
               );
             })}

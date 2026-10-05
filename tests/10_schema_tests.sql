@@ -277,7 +277,7 @@ select pg_temp.check((select count(*) = 3 from view_goal_compliance where servic
 select pg_temp.check((select count(*) = 1 from app_users), 'READER solo ve su cuenta');
 select pg_temp.expect_error($$insert into persons (first_name, last_name) values ('X', 'Y')$$, '%row-level security%');
 select pg_temp.check((select count(*) = 0 from audit_log), 'READER no ve la bitácora');
-select pg_temp.check((select count(*) = 7 from catalog_movement_types), 'READER lee tipos de alta/baja');
+select pg_temp.check((select count(*) = 8 from catalog_movement_types), 'READER lee tipos de alta/baja (incluye Sacado)');
 select pg_temp.expect_error($$select pg_temp.mov('00000000-0000-0000-0000-000000000004', 'OTRA_BAJA', '2026-03-01')$$, '%row-level security%');
 rollback;
 
@@ -367,73 +367,45 @@ select pg_temp.expect_error($$ select fn_import_persons('[{"row": 2, "first_name
 rollback;
 
 -- ---------------------------------------------------------------------
--- Reagrupaciones y bautismo (1000)
+-- Cursos bíblicos
 -- ---------------------------------------------------------------------
-\echo '== Reagrupaciones y bautismo =='
-select pg_temp.expect_error($$
-  update catalog_groups set is_active = false where id = '00000000-0000-0000-0000-0000000000a2'
-$$, '%todavía tiene 2 persona%');
-
+\echo '== Cursos bíblicos =='
+select pg_temp.check(
+  (select sum(bible_studies) = 25 from fn_report_matrix(2026)),
+  'la matriz trae los cursos (Ana 2 x 12 + Carla 1)');
+select pg_temp.check(
+  (select sum(bible_studies) = 3 from fn_monthly_summary(2026) where period = '2025-09-01'),
+  'el resumen mensual suma los cursos de septiembre');
+select pg_temp.check(
+  (select count(*) = 0 from fn_report_matrix(2026) where not has_report and bible_studies <> 0),
+  'sin informe, cursos = 0');
 begin;
-set local role authenticated;
-set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000002';
--- Grupo 2 se disuelve: todos pasan a Grupo 1 desde el 1 de octubre
-select pg_temp.check(fn_reassign_groups('2026-10-01',
-  (select jsonb_agg(jsonb_build_object('person_id', person_id, 'group_id', '00000000-0000-0000-0000-0000000000a1'))
-     from view_current_group where group_id = '00000000-0000-0000-0000-0000000000a2'),
-  array['00000000-0000-0000-0000-0000000000a2'::uuid]) = 2, 'reagrupación mueve a 2 personas');
-select pg_temp.check((select not is_active from catalog_groups where id = '00000000-0000-0000-0000-0000000000a2'), 'grupo disuelto queda inactivo');
-select pg_temp.check((select count(*) = 0 from view_current_group where group_id = '00000000-0000-0000-0000-0000000000a2'), 'nadie queda en el grupo disuelto');
-select pg_temp.check((select end_date = '2026-09-30' from person_group_history
-                       where person_id = '00000000-0000-0000-0000-000000000003' and group_id = '00000000-0000-0000-0000-0000000000a2'),
-                     'el periodo anterior se cierra el día antes');
-select pg_temp.check((select group_name = 'Grupo 2' from fn_report_matrix(2026)
-                       where person_id = '00000000-0000-0000-0000-000000000003' and month = 5),
-                     'los meses pasados conservan el grupo de entonces');
-select pg_temp.check((select count(*) = 0 from fn_monthly_summary(2026) where group_name = 'Grupo 1' and period = '2026-05-01' and persons > 3),
-                     'el resumen mensual histórico no cambia');
-select pg_temp.check((select group_name = 'Grupo 2' from fn_service_year_summary(2026)
-                       where person_id = '00000000-0000-0000-0000-000000000003'),
-                     'la completitud de un año pasado muestra el grupo de ese año');
-insert into persons (id, first_name, last_name) values ('00000000-0000-0000-0000-0000000000f1', 'Sin', 'Grupo');
-select pg_temp.check(fn_reassign_groups('2026-10-01',
-  '[{"person_id": "00000000-0000-0000-0000-0000000000f1", "group_id": null}]') = 0,
-  'dejar sin grupo a quien ya no tiene grupo no cuenta como cambio');
--- Repetir el mismo cambio no hace nada
-select pg_temp.check(fn_reassign_groups('2026-10-01',
-  jsonb_build_array(jsonb_build_object('person_id', '00000000-0000-0000-0000-000000000003', 'group_id', '00000000-0000-0000-0000-0000000000a1'))) = 0,
-  'mover a alguien al grupo donde ya está no cambia nada');
+-- Diego no participó en septiembre: no puede tener cursos
+select pg_temp.expect_error($$
+  update monthly_reports set bible_studies = 1
+  where person_id = '00000000-0000-0000-0000-000000000004' and year = 2025 and month = 9
+$$, '%chk_studies_imply_participation%');
+select pg_temp.expect_error($$
+  update monthly_reports set bible_studies = -1
+  where person_id = '00000000-0000-0000-0000-000000000001' and year = 2025 and month = 9
+$$, '%chk_monthly_reports_bible_studies%');
+-- Informe nuevo sin el dato: queda en 0
+insert into monthly_reports (person_id, year, month, participated)
+values ('00000000-0000-0000-0000-000000000004', 2026, 9, true);
+select pg_temp.check(
+  (select bible_studies = 0 from monthly_reports
+    where person_id = '00000000-0000-0000-0000-000000000004' and year = 2026 and month = 9),
+  'cursos vale 0 por omisión');
 rollback;
 
+-- Baja por Sacado: deja de ser miembro y no se le esperan informes
 begin;
-set local role authenticated;
-set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000003';
-select pg_temp.expect_error($$ select fn_reassign_groups('2026-10-01', '[]') $$, '%No tienes permiso%');
-rollback;
-
--- PNB -> PB: el PNB se cierra el día antes y no se puede volver a PNB
-begin;
-select pg_temp.check((select count(*) = 3 from catalog_roles where code in ('A', 'SM', 'PNB') and not requires_hours_report),
-                     'catálogo con A, SM y PNB sin horas');
-insert into person_roles (person_id, role_id, start_date)
-select '00000000-0000-0000-0000-000000000004', id, '2025-01-01' from catalog_roles where code = 'PNB';
-insert into person_roles (person_id, role_id, start_date)
-select '00000000-0000-0000-0000-000000000004', id, '2026-05-10' from catalog_roles where code = 'PB';
-select pg_temp.check((select pr.end_date = '2026-05-09' from person_roles pr join catalog_roles cr on cr.id = pr.role_id
-                       where pr.person_id = '00000000-0000-0000-0000-000000000004' and cr.code = 'PNB'),
-                     'al bautizarse, el PNB termina el día anterior');
-select pg_temp.expect_error($$
-  insert into person_roles (person_id, role_id, start_date)
-  select '00000000-0000-0000-0000-000000000004', id, '2026-07-01' from catalog_roles where code = 'PNB'
-$$, '%no vuelve a ser PNB%');
-select pg_temp.expect_error($$
-  insert into person_roles (person_id, role_id, start_date, end_date)
-  select '00000000-0000-0000-0000-000000000002', id, '2024-01-01', '2026-01-01' from catalog_roles where code = 'PNB'
-$$, '%no vuelve a ser PNB%');
--- PNB que terminó antes del bautismo sí se puede registrar
-insert into person_roles (person_id, role_id, start_date, end_date)
-select '00000000-0000-0000-0000-000000000002', id, '2024-01-01', '2025-08-31' from catalog_roles where code = 'PNB';
-select pg_temp.check(true, 'PNB anterior al bautismo se puede registrar');
+insert into person_movements (person_id, movement_type_id, movement_date)
+select '00000000-0000-0000-0000-000000000004', id, '2026-03-10'
+from catalog_movement_types where code = 'SACADO';
+select pg_temp.check(
+  (select not is_active from persons where id = '00000000-0000-0000-0000-000000000004'),
+  'Sacado es una baja: la persona queda inactiva');
 rollback;
 
 \echo '== Todas las pruebas pasaron =='

@@ -81,6 +81,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); o
 input:disabled, select:disabled { opacity: .7; }
 input[type=checkbox], input[type=radio] { padding: 0; }
 input.hours { width: 6.5rem; text-align: right; }
+input.hours.studies { width: 4rem; }
 input.short { width: 6.5rem; }
 input.invalid { border-color: var(--bad); background: var(--bad-bg); }
 label { display: flex; flex-direction: column; gap: .25rem; font-size: .9rem; }

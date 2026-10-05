@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { YearSelect } from '@/components/YearSelect';
 import { Empty, Kpi, PageHeader, Progress, StatusBadge } from '@/components/ui';
 import { loadAnnualOverview } from '@/lib/export/build';
-import { yearStatusText, type RoleTotals } from '@/lib/export/annual';
+import { avgPerMonth, yearStatusText, type RoleTotals } from '@/lib/export/annual';
 import { goalCompliance } from '@/lib/services/metrics';
 import { fmtNum, fmtPct, fullName } from '@/lib/format';
 import { serviceYearLabel } from '@/lib/service-year';
@@ -28,6 +28,7 @@ export default async function InformeAnualPage({ searchParams }: { searchParams:
         <Kpi label="Meses cerrados" value={`${o.monthsClosed} / 12`} hint={serviceYearLabel(sy)} />
         <Kpi label="Informes recibidos" value={`${fmtNum(o.received)} / ${fmtNum(o.expected)}`} hint={fmtPct(o.pctReported)} />
         <Kpi label="Horas informadas" value={fmtNum(o.totalHours)} />
+        <Kpi label="Cursos bíblicos" value={fmtNum(o.studiesAvg)} hint="promedio por mes" />
         <Kpi label="Altas / bajas" value={`${o.altas} / ${o.bajas}`} />
       </section>
 
@@ -65,7 +66,7 @@ export default async function InformeAnualPage({ searchParams }: { searchParams:
         {o.groups.length === 0 ? <Empty>Aún no hay meses cerrados en este año de servicio.</Empty> : (
           <table className="table">
             <thead>
-              <tr><th>Grupo</th><th className="num">Informes</th><th>% informado</th><th className="num">Con participación</th><th className="num">Horas</th></tr>
+              <tr><th>Grupo</th><th className="num">Informes</th><th>% informado</th><th className="num">Con participación</th><th className="num">Horas</th><th className="num">Cursos (prom./mes)</th></tr>
             </thead>
             <tbody>
               {o.groups.map((g) => (
@@ -75,6 +76,7 @@ export default async function InformeAnualPage({ searchParams }: { searchParams:
                   <td><Progress value={g.pct} /> {fmtPct(g.pct)}</td>
                   <td className="num">{g.participated}</td>
                   <td className="num">{fmtNum(g.hours)}</td>
+                  <td className="num">{fmtNum(avgPerMonth(g.studies, o))}</td>
                 </tr>
               ))}
             </tbody>
