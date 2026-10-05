@@ -52,7 +52,7 @@ Pantallas:
 | Pantalla | Qué hace |
 |---|---|
 | Panel | Personas activas, informes del último mes cerrado, completitud promedio, avance de metas PR/PA y quién va atrasado. |
-| Informes del mes | Hoja de captura mensual: Sí / No / Sin informe para todos y horas para quien era PR o PA ese mes (obligatorias). Guarda solo lo que cambió. |
+| Informes del mes | Hoja de captura mensual: Sí / No / Sin informe para todos y horas para quien era PR o PA ese mes (obligatorias); cursos bíblicos para todos (vacío = 0). Guarda solo lo que cambió. |
 | Personas | Listado con filtros; ficha con metas del año, informes mes a mes, altas/bajas/traslados, cargos, grupos, contactos y fechas. |
 | Importar desde Excel | En Personas: plantilla descargable (con listas de grupos, cargos y motivos de alta), vista previa con los errores de cada fila y guardado en una sola transacción (`fn_import_persons`). Omite a quien ya existe con el mismo nombre. |
 | Altas y bajas | Altas, bajas y traslados del año de servicio con totales; exportable a Excel o PDF. |

@@ -24,6 +24,7 @@ export interface GroupTotals {
   participated: number;
   pct: number | null;
   hours: number;
+  studies: number;    // suma de cursos bíblicos de todos los meses
 }
 
 export interface AnnualOverview {
@@ -36,6 +37,8 @@ export interface AnnualOverview {
   pctReported: number | null;
   participated: number;
   totalHours: number;
+  studiesAvg: number | null;  // cursos bíblicos promedio por mes cerrado
+  monthsWithData: number;     // meses con resumen (divisor del promedio)
   pr: RoleTotals;
   pa: RoleTotals;
   altas: number;
@@ -72,17 +75,19 @@ export function annualOverview(
   const groups = new Map<string, GroupTotals>();
   for (const m of data.monthly) {
     const name = m.group_name ?? 'Sin grupo';
-    const g = groups.get(name) ?? { group: name, expected: 0, received: 0, participated: 0, pct: null, hours: 0 };
+    const g = groups.get(name) ?? { group: name, expected: 0, received: 0, participated: 0, pct: null, hours: 0, studies: 0 };
     g.expected += m.persons;
     g.received += m.reports_received;
     g.participated += m.participated;
     g.hours += Number(m.total_hours ?? 0);
+    g.studies += Number(m.bible_studies ?? 0);
     groups.set(name, g);
   }
   const groupList = [...groups.values()]
     .map((g) => ({ ...g, pct: pct(g.received, g.expected) }))
     .sort((a, b) => (a.group === 'Sin grupo' ? 1 : b.group === 'Sin grupo' ? -1 : a.group.localeCompare(b.group)));
-  const sum = (k: 'expected' | 'received' | 'participated' | 'hours') => groupList.reduce((a, g) => a + g[k], 0);
+  const sum = (k: 'expected' | 'received' | 'participated' | 'hours' | 'studies') => groupList.reduce((a, g) => a + g[k], 0);
+  const periods = new Set(data.monthly.map((m) => m.period)).size;
   const altas = data.movements.filter((m) => m.direction === 'ALTA').length;
 
   return {
@@ -95,6 +100,8 @@ export function annualOverview(
     pctReported: pct(sum('received'), sum('expected')),
     participated: sum('participated'),
     totalHours: sum('hours'),
+    monthsWithData: periods,
+    studiesAvg: periods ? Math.round((10 * sum('studies')) / periods) / 10 : null,
     pr: roleTotals(data.compliance, 'PR'),
     pa: roleTotals(data.compliance, 'PA'),
     altas,
@@ -124,6 +131,7 @@ export function annualSummaryTable(o: AnnualOverview): ReportTable {
     ['Informes recibidos', `${fmtNum(o.received)} de ${fmtNum(o.expected)} (${fmtPct(o.pctReported)})`],
     ['Informes con participación', fmtNum(o.participated)],
     ['Horas informadas', fmtNum(o.totalHours)],
+    ['Cursos bíblicos (promedio por mes)', fmtNum(o.studiesAvg)],
     ['PR: personas', fmtNum(o.pr.persons)],
     ['PR: horas / meta', `${fmtNum(o.pr.hours)} de ${fmtNum(o.pr.goal)} (${fmtPct(o.pr.pct)})`],
     ['PR: resultado', roleLine(o.pr, o.closed)],
@@ -155,13 +163,22 @@ export function groupTotalsTable(o: AnnualOverview): ReportTable {
       { header: 'Grupo', width: 18 }, { header: 'Informes esperados', format: 'num' },
       { header: 'Informes recibidos', format: 'num' }, { header: '% informado', format: 'pct' },
       { header: 'Con participación', format: 'num' }, { header: 'Horas', format: 'num' },
+      { header: 'Cursos (prom./mes)', format: 'num' },
     ],
     rows: [
-      ...o.groups.map((g): Cell[] => [g.group, g.expected, g.received, g.pct, g.participated, g.hours]),
+      ...o.groups.map((g): Cell[] => [g.group, g.expected, g.received, g.pct, g.participated, g.hours, avgPerMonth(g.studies, o)]),
       ...(o.groups.length > 1
-        ? [['Total', o.expected, o.received, o.pctReported, o.participated, o.totalHours] as Cell[]]
+        ? [['Total', o.expected, o.received, o.pctReported, o.participated, o.totalHours, o.studiesAvg] as Cell[]]
         : []),
     ],
-    notes: ['Cada persona cuenta en el grupo al que pertenecía ese mes.'],
+    notes: [
+      'Cada persona cuenta en el grupo al que pertenecía ese mes.',
+      'Cursos: suma de los cursos bíblicos informados cada mes, promediada entre los meses cerrados.',
+    ],
   };
+}
+
+/** Promedio mensual de cursos bíblicos, con un decimal. */
+export function avgPerMonth(total: number, o: AnnualOverview): number | null {
+  return o.monthsWithData ? Math.round((10 * total) / o.monthsWithData) / 10 : null;
 }

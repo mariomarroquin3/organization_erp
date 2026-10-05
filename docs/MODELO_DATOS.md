@@ -10,14 +10,16 @@ Iteración sobre el `schema.sql` y el `CONTEXTO_PROYECTO.md` originales. Se cons
 
 **Informe mensual (`monthly_reports`).** Reemplaza `service_hours`. Un registro por persona y mes para todos:
 
-| Quién | `participated` | `hours` |
-|---|---|---|
-| PR / PA ese mes | obligatorio | obligatorio (0 si no hubo) |
-| Cualquier otra persona | obligatorio (sí/no) | vacío |
+| Quién | `participated` | `hours` | `bible_studies` |
+|---|---|---|---|
+| PR / PA ese mes | obligatorio | obligatorio (0 si no hubo) | 0 por omisión |
+| Cualquier otra persona (PNB, PB, otros cargos) | obligatorio (sí/no) | vacío | 0 por omisión |
+
+`bible_studies` son los cursos bíblicos del mes (0 a 99, migración 1100); si es mayor que 0, la persona participó.
 
 El cargo de cada mes se deduce del historial (`person_roles`), así que alguien que fue PA en marzo y PR desde abril queda bien medido en cada tramo.
 
-**Altas, bajas y traslados (`person_movements`).** Cada persona tiene un historial de altas (nuevo ingreso, traslado desde otra congregación, reingreso) y bajas (traslado a otra congregación, fallecimiento, dejó de participar, otra), con fecha y congregación de origen o destino (obligatoria en los traslados). Los tipos están en `catalog_movement_types`. Reglas:
+**Altas, bajas y traslados (`person_movements`).** Cada persona tiene un historial de altas (nuevo ingreso, traslado desde otra congregación, reingreso) y bajas (traslado a otra congregación, fallecimiento, dejó de participar, sacado, otra), con fecha y congregación de origen o destino (obligatoria en los traslados). Los tipos están en `catalog_movement_types`. Reglas:
 
 - Altas y bajas se alternan; no hay dos en la misma fecha ni fechas futuras.
 - La fecha de una baja es el primer día en que ya no pertenece. Una baja que es el último movimiento cierra el cargo y el grupo vigentes el día anterior.

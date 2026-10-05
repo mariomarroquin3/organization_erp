@@ -51,7 +51,7 @@ export async function getPersonDetail(db: Db, id: string, serviceYear: number) {
       .eq('person_id', id).order('is_primary', { ascending: false }),
     db.from('person_dates').select('id, person_id, date_type_id, date_value, catalog_date_types(name)')
       .eq('person_id', id).order('date_value'),
-    db.from('monthly_reports').select('id, person_id, year, month, participated, hours, notes, service_year')
+    db.from('monthly_reports').select('id, person_id, year, month, participated, hours, bible_studies, notes, service_year')
       .eq('person_id', id).eq('service_year', serviceYear).order('year').order('month'),
     listMovements(db, { personId: id }),
   ]);

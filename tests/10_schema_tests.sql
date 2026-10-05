@@ -277,7 +277,7 @@ select pg_temp.check((select count(*) = 3 from view_goal_compliance where servic
 select pg_temp.check((select count(*) = 1 from app_users), 'READER solo ve su cuenta');
 select pg_temp.expect_error($$insert into persons (first_name, last_name) values ('X', 'Y')$$, '%row-level security%');
 select pg_temp.check((select count(*) = 0 from audit_log), 'READER no ve la bitácora');
-select pg_temp.check((select count(*) = 7 from catalog_movement_types), 'READER lee tipos de alta/baja');
+select pg_temp.check((select count(*) = 8 from catalog_movement_types), 'READER lee tipos de alta/baja (incluye Sacado)');
 select pg_temp.expect_error($$select pg_temp.mov('00000000-0000-0000-0000-000000000004', 'OTRA_BAJA', '2026-03-01')$$, '%row-level security%');
 rollback;
 
@@ -364,6 +364,48 @@ set local role authenticated;
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000003';
 select pg_temp.expect_error($$ select fn_import_persons('[{"row": 2, "first_name": "X", "last_name": "Y"}]') $$,
                             '%No tienes permiso%');
+rollback;
+
+-- ---------------------------------------------------------------------
+-- Cursos bíblicos
+-- ---------------------------------------------------------------------
+\echo '== Cursos bíblicos =='
+select pg_temp.check(
+  (select sum(bible_studies) = 25 from fn_report_matrix(2026)),
+  'la matriz trae los cursos (Ana 2 x 12 + Carla 1)');
+select pg_temp.check(
+  (select sum(bible_studies) = 3 from fn_monthly_summary(2026) where period = '2025-09-01'),
+  'el resumen mensual suma los cursos de septiembre');
+select pg_temp.check(
+  (select count(*) = 0 from fn_report_matrix(2026) where not has_report and bible_studies <> 0),
+  'sin informe, cursos = 0');
+begin;
+-- Diego no participó en septiembre: no puede tener cursos
+select pg_temp.expect_error($$
+  update monthly_reports set bible_studies = 1
+  where person_id = '00000000-0000-0000-0000-000000000004' and year = 2025 and month = 9
+$$, '%chk_studies_imply_participation%');
+select pg_temp.expect_error($$
+  update monthly_reports set bible_studies = -1
+  where person_id = '00000000-0000-0000-0000-000000000001' and year = 2025 and month = 9
+$$, '%chk_monthly_reports_bible_studies%');
+-- Informe nuevo sin el dato: queda en 0
+insert into monthly_reports (person_id, year, month, participated)
+values ('00000000-0000-0000-0000-000000000004', 2026, 9, true);
+select pg_temp.check(
+  (select bible_studies = 0 from monthly_reports
+    where person_id = '00000000-0000-0000-0000-000000000004' and year = 2026 and month = 9),
+  'cursos vale 0 por omisión');
+rollback;
+
+-- Baja por Sacado: deja de ser miembro y no se le esperan informes
+begin;
+insert into person_movements (person_id, movement_type_id, movement_date)
+select '00000000-0000-0000-0000-000000000004', id, '2026-03-10'
+from catalog_movement_types where code = 'SACADO';
+select pg_temp.check(
+  (select not is_active from persons where id = '00000000-0000-0000-0000-000000000004'),
+  'Sacado es una baja: la persona queda inactiva');
 rollback;
 
 \echo '== Todas las pruebas pasaron =='

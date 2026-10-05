@@ -9,15 +9,18 @@ export interface SheetEntry {
   person_id: string;
   state: ReportState;   // '' = sin informe
   hours: string;        // texto tal cual del formulario
+  studies?: string;     // cursos bíblicos; vacío = 0
 }
 
 export interface ExistingReport {
-  id: string; person_id: string; participated: boolean; hours: number | null;
+  id: string; person_id: string; participated: boolean; hours: number | null; bible_studies: number;
 }
 
 export interface PersonInfo { name: string; hoursRole: string | null }
 
-export interface ReportUpsert { person_id: string; year: number; month: number; participated: boolean; hours: number | null }
+export interface ReportUpsert {
+  person_id: string; year: number; month: number; participated: boolean; hours: number | null; bible_studies: number;
+}
 
 export interface SavePlan {
   upserts: ReportUpsert[];
@@ -31,6 +34,14 @@ export function parseHours(raw: string): number | null | 'invalid' {
   if (!/^\d+(\.\d{1,2})?$/.test(s)) return 'invalid';
   const n = Number(s);
   return n > 744 ? 'invalid' : n;
+}
+
+/** Cursos bíblicos: entero de 0 a 99; vacío cuenta como 0. */
+export function parseStudies(raw: string | undefined): number | 'invalid' {
+  const s = (raw ?? '').trim();
+  if (s === '') return 0;
+  if (!/^\d{1,2}$/.test(s)) return 'invalid';
+  return Number(s);
 }
 
 export function planMonthSave(
@@ -51,14 +62,21 @@ export function planMonthSave(
     }
     const prev = byPerson.get(e.person_id);
     const hours = parseHours(e.hours);
+    const studies = parseStudies(e.studies);
 
     if (hours === 'invalid') {
       plan.errors.push(`${info.name}: horas no válidas (número de 0 a 744, hasta 2 decimales).`);
       continue;
     }
+    if (studies === 'invalid') {
+      plan.errors.push(`${info.name}: cursos bíblicos no válidos (número entero de 0 a 99).`);
+      continue;
+    }
     if (e.state === '') {
       if (hours !== null && hours > 0) {
         plan.errors.push(`${info.name}: tiene horas pero no se marcó si participó.`);
+      } else if (studies > 0) {
+        plan.errors.push(`${info.name}: tiene cursos bíblicos pero no se marcó si participó.`);
       } else if (prev) {
         plan.deletes.push(prev.id);
       }
@@ -74,8 +92,13 @@ export function planMonthSave(
       plan.errors.push(`${info.name}: informó horas, así que debe marcarse que participó.`);
       continue;
     }
-    if (prev && prev.participated === participated && numEq(prev.hours, hours)) continue;
-    plan.upserts.push({ person_id: e.person_id, year, month, participated, hours });
+    if (!participated && studies > 0) {
+      plan.errors.push(`${info.name}: informó cursos bíblicos, así que debe marcarse que participó.`);
+      continue;
+    }
+    if (prev && prev.participated === participated && numEq(prev.hours, hours)
+        && Number(prev.bible_studies ?? 0) === studies) continue;
+    plan.upserts.push({ person_id: e.person_id, year, month, participated, hours, bible_studies: studies });
   }
   return plan;
 }

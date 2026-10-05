@@ -15,7 +15,8 @@ export async function saveSheetAction(_prev: ActionState, fd: FormData): Promise
     const entries: SheetEntry[] = fd.getAll('person_id').map((id) => {
       const pid = String(id);
       const state = String(fd.get(`state_${pid}`) ?? '') as ReportState;
-      return { person_id: pid, state: ['si', 'no'].includes(state) ? state : '', hours: String(fd.get(`hours_${pid}`) ?? '') };
+      return { person_id: pid, state: ['si', 'no'].includes(state) ? state : '', hours: String(fd.get(`hours_${pid}`) ?? ''),
+        studies: String(fd.get(`studies_${pid}`) ?? '') };
     });
     const db = await createClient();
     const res = await saveMonthSheet(db, ym, entries);
