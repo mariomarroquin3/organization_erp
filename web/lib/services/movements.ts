@@ -1,6 +1,6 @@
 import type { Db } from '@/lib/supabase/server';
 import type { MembershipPeriod, MovementDirection, MovementType, PersonMovement } from '@/lib/types';
-import { check } from './errors';
+import { check, fetchAll } from './errors';
 
 // Altas, bajas y traslados (migración 0800). La base valida que se
 // alternen, cierra cargos y grupo al dar de baja y mantiene
@@ -27,7 +27,8 @@ export async function deleteMovement(db: Db, id: string) {
 }
 
 export async function listMembershipPeriods(db: Db) {
-  return check(await db.from('view_membership_periods').select('person_id, start_date, end_date')) as MembershipPeriod[];
+  return fetchAll<MembershipPeriod>((from, to) => db.from('view_membership_periods')
+    .select('person_id, start_date, end_date').order('person_id').order('start_date').range(from, to));
 }
 
 /** ¿Era miembro al menos un día entre from y to (fechas ISO inclusivas)? */

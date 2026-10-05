@@ -2,7 +2,7 @@ import type { Db } from '@/lib/supabase/server';
 import type {
   Person, PersonOverview, RoleHistoryRow, GroupHistoryRow, PersonContact, PersonDate, MonthlyReport, PersonMovement,
 } from '@/lib/types';
-import { check, ServiceError } from './errors';
+import { check, fetchAll, ServiceError } from './errors';
 import { addMovement, listMovements } from './movements';
 
 export interface PersonFilters {
@@ -13,11 +13,13 @@ export interface PersonFilters {
 }
 
 export async function listPersons(db: Db, f: PersonFilters = {}) {
-  let q = db.from('view_persons_overview').select('*').order('last_name').order('first_name');
   const status = f.status ?? 'activos';
-  if (status !== 'todos') q = q.eq('is_active', status === 'activos');
-  if (f.groupId) q = q.eq('group_id', f.groupId);
-  let rows = check(await q) as PersonOverview[];
+  let rows = await fetchAll<PersonOverview>((from, to) => {
+    let q = db.from('view_persons_overview').select('*').order('last_name').order('first_name').order('person_id');
+    if (status !== 'todos') q = q.eq('is_active', status === 'activos');
+    if (f.groupId) q = q.eq('group_id', f.groupId);
+    return q.range(from, to);
+  });
 
   // Filtros de texto y cargo en memoria: la lista es de decenas o pocos
   // cientos de personas y así se evita escapar patrones en PostgREST.

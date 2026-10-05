@@ -392,6 +392,13 @@ select pg_temp.check((select group_name = 'Grupo 2' from fn_report_matrix(2026)
                      'los meses pasados conservan el grupo de entonces');
 select pg_temp.check((select count(*) = 0 from fn_monthly_summary(2026) where group_name = 'Grupo 1' and period = '2026-05-01' and persons > 3),
                      'el resumen mensual histórico no cambia');
+select pg_temp.check((select group_name = 'Grupo 2' from fn_service_year_summary(2026)
+                       where person_id = '00000000-0000-0000-0000-000000000003'),
+                     'la completitud de un año pasado muestra el grupo de ese año');
+insert into persons (id, first_name, last_name) values ('00000000-0000-0000-0000-0000000000f1', 'Sin', 'Grupo');
+select pg_temp.check(fn_reassign_groups('2026-10-01',
+  '[{"person_id": "00000000-0000-0000-0000-0000000000f1", "group_id": null}]') = 0,
+  'dejar sin grupo a quien ya no tiene grupo no cuenta como cambio');
 -- Repetir el mismo cambio no hace nada
 select pg_temp.check(fn_reassign_groups('2026-10-01',
   jsonb_build_array(jsonb_build_object('person_id', '00000000-0000-0000-0000-000000000003', 'group_id', '00000000-0000-0000-0000-0000000000a1'))) = 0,

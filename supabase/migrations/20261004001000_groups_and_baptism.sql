@@ -14,6 +14,9 @@
 --     bautizado). Son cargos sin horas, con historial por periodos.
 --   * Regla del bautismo: quien es PB nunca vuelve a ser PNB. Al darle
 --     PB a alguien con PNB vigente, el PNB se cierra el día anterior.
+--   * fn_service_year_summary muestra el grupo que la persona tenía al
+--     final de ese año de servicio (antes mostraba el grupo actual, así
+--     que una reagrupación cambiaba los informes de años pasados).
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
@@ -91,8 +94,8 @@ begin
         raise exception 'tiene un cambio de grupo posterior (%); corrígelo desde su ficha.', to_char(cur.start_date, 'DD/MM/YYYY');
       end if;
 
-      if found and cur.group_id is not distinct from v_group then
-        continue;  -- ya está en ese grupo
+      if (found and cur.group_id is not distinct from v_group) or (not found and v_group is null) then
+        continue;  -- ya está en ese grupo (o ya estaba sin grupo)
       end if;
 
       if found and cur.start_date = p_date then
@@ -150,7 +153,7 @@ declare
   v_pnb  record;
 begin
   select code into v_code from catalog_roles where id = new.role_id;
-  if v_code not in ('PB', 'PNB') then
+  if v_code is null or v_code not in ('PB', 'PNB') then
     return new;
   end if;
   perform pg_advisory_xact_lock(hashtextextended(new.person_id::text, 0));
@@ -194,3 +197,41 @@ $$;
 create trigger trg_check_baptism_rule
 before insert or update of person_id, role_id, start_date, end_date on public.person_roles
 for each row execute function public.check_baptism_rule();
+
+-- ---------------------------------------------------------------------
+-- 5. Completitud: grupo de ese año, no el actual
+-- ---------------------------------------------------------------------
+create or replace function public.fn_service_year_summary(p_service_year int)
+returns table (
+  person_id            uuid,
+  first_name           text,
+  last_name            text,
+  group_name           text,
+  current_roles        text,
+  months_expected      int,
+  months_reported      int,
+  months_participated  int,
+  pct_reported         numeric,
+  pct_participated     numeric,
+  total_hours          numeric
+)
+language sql
+stable
+set search_path = public
+as $$
+  select
+    m.person_id, m.first_name, m.last_name,
+    -- Grupo del último mes del año en que tuvo grupo
+    (array_agg(m.group_name order by m.period desc) filter (where m.group_name is not null))[1],
+    o.current_roles,
+    count(*)::int,
+    count(*) filter (where m.has_report)::int,
+    count(*) filter (where m.participated)::int,
+    round(100.0 * count(*) filter (where m.has_report)   / nullif(count(*), 0), 1),
+    round(100.0 * count(*) filter (where m.participated) / nullif(count(*), 0), 1),
+    coalesce(sum(m.hours), 0)
+  from fn_report_matrix(p_service_year) m
+  join view_persons_overview o on o.person_id = m.person_id
+  group by m.person_id, m.first_name, m.last_name, o.current_roles
+  order by m.last_name, m.first_name;
+$$;

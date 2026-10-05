@@ -57,4 +57,10 @@ describe('planMonthSave', () => {
   it('rechaza personas que no están en la hoja', () => {
     expect(planMonthSave(2026, 3, [{ person_id: 'otra', state: 'si', hours: '' }], [], people).errors).toHaveLength(1);
   });
+
+  it('un 0 sin marcar Sí/No no se descarta en silencio', () => {
+    const plan = planMonthSave(2026, 3, [{ person_id: 'pr', state: '', hours: '0' }], [], people);
+    expect(plan.errors[0]).toContain('no se marcó si participó');
+    expect(plan.upserts).toEqual([]);
+  });
 });

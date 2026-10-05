@@ -78,9 +78,11 @@ describe('validación de filas', () => {
       row(5, { first_name: 'G', last_name: 'H', alta_type: 'Traslado desde otra congregación', alta_date: '01/09/2026' }),
       row(6, { first_name: 'I', last_name: 'J', alta_type: 'Otra baja', alta_date: '01/09/2026' }),
       row(7, { first_name: 'K', last_name: 'L', roles: 'PB PNB' }),
+      row(8, { first_name: 'M', last_name: 'N', roles: 'publicador no bautizado' }),
     ], cat, [], TODAY);
     expect(r.counts.error).toBe(6);
-    expect(r.payload).toHaveLength(0);
+    expect(r.rows.find((x) => x.row === 8)).toMatchObject({ status: 'ok', roles: 'PNB' });
+    expect(r.payload.map((p) => p.row)).toEqual([8]);
     const msg = (n: number) => r.rows.find((x) => x.row === n)!.messages.join(' ');
     expect(msg(2)).toContain('apellidos');
     expect(msg(3)).toContain('"Viejo" no existe');
