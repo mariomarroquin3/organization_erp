@@ -5,6 +5,7 @@ import ExcelJS from 'exceljs';
 import type { CatalogGroup, CatalogRole, CatalogType, MovementType } from '@/lib/types';
 import { currentServiceYear } from '@/lib/service-year';
 
+export const LIST_ROWS = 100;
 export const MAX_ROWS = 1000;
 export const SHEET = 'Personas';
 
@@ -354,21 +355,31 @@ export async function buildTemplate(cat: ImportCatalogs, today = new Date()): Pr
     lists.addRow([groups[i] ?? null, roles[i]?.code ?? null, roles[i]?.name ?? null, altas[i]?.name ?? null]);
   }
 
-  // Listas desplegables en Grupo y Motivo de alta
+  // Listas desplegables en Grupo y Motivo de alta. El rango llega hasta la
+  // fila LIST_ROWS de Listas aunque haya menos grupos: un grupo escrito a
+  // mano debajo del último también aparece (antes el rango terminaba en el
+  // último grupo y no se actualizaba). Rango fijo y no OFFSET para que
+  // funcione igual en Excel, LibreOffice y Google Sheets.
   const col = (key: ColumnKey) => COLUMNS.findIndex((c) => c.key === key) + 1;
+  const listRange = (c: string) => `Listas!$${c}$2:$${c}$${LIST_ROWS + 1}`;
+  const colRange = (key: ColumnKey) => {
+    const letter = ws.getColumn(col(key)).letter;
+    return `${letter}2:${letter}${MAX_ROWS + 1}`;
+  };
+  // Una validación por columna entera. Asignarla celda por celda hace que
+  // exceljs escriba rangos solapados (ordena "D10" antes que "D2").
+  const validations = (ws as unknown as { dataValidations: { add(a: string, v: ExcelJS.DataValidation): void } })
+    .dataValidations;
+  validations.add(colRange('group'), {
+    type: 'list', allowBlank: true, formulae: [listRange('A')],
+    showErrorMessage: true, errorTitle: 'Grupo',
+    error: 'Elige un grupo de la lista (columna Grupos de la hoja Listas).',
+  });
+  validations.add(colRange('alta_type'), {
+    type: 'list', allowBlank: true, formulae: [listRange('D')],
+    showErrorMessage: true, errorTitle: 'Motivo de alta', error: 'Elige un motivo de la lista.',
+  });
   for (let r = 2; r <= MAX_ROWS + 1; r++) {
-    if (groups.length) {
-      ws.getCell(r, col('group')).dataValidation = {
-        type: 'list', allowBlank: true, formulae: [`Listas!$A$2:$A$${groups.length + 1}`],
-        showErrorMessage: true, errorTitle: 'Grupo', error: 'Elige un grupo de la lista.',
-      };
-    }
-    if (altas.length) {
-      ws.getCell(r, col('alta_type')).dataValidation = {
-        type: 'list', allowBlank: true, formulae: [`Listas!$D$2:$D$${altas.length + 1}`],
-        showErrorMessage: true, errorTitle: 'Motivo de alta', error: 'Elige un motivo de la lista.',
-      };
-    }
     for (const k of ['birth_date', 'group_start', 'roles_start', 'alta_date'] as const) {
       ws.getCell(r, col(k)).numFmt = 'dd/mm/yyyy';
     }
@@ -382,6 +393,7 @@ export async function buildTemplate(cat: ImportCatalogs, today = new Date()): Pr
   for (const line of [
     'Una fila por persona en la hoja "Personas". No cambies los encabezados.',
     `Las fechas vacías de grupo y cargos toman el ${defaultStartDate(today).split('-').reverse().join('/')} (inicio del año de servicio actual).`,
+    'La hoja Listas trae los grupos activos del sistema al descargar la plantilla. Si creas un grupo después, descarga la plantilla de nuevo o escríbelo debajo del último grupo (debe existir en Configuración con el mismo nombre).',
     'Las personas que ya existen con el mismo nombre y apellidos se omiten.',
     'Antes de guardar, la app muestra una vista previa con los errores de cada fila. Si hay errores no se guarda nada.',
   ]) help.addRow(['', line]);
