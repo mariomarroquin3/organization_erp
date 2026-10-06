@@ -132,6 +132,24 @@ describe('plantilla y lectura', () => {
     expect(r.payload[0].contacts).toEqual([{ contact_type_id: 'mail', value: 'ana@example.com' }]);
   });
 
+  it('el desplegable de grupos trae todos los grupos activos y admite grupos añadidos a mano', async () => {
+    const many: ImportCatalogs = {
+      ...cat,
+      groups: [1, 2, 3, 4, 5, 6].map((n) => ({ id: `g${n}`, name: `Grupo ${n}`, description: null, is_active: true })),
+    };
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(await buildTemplate(many, TODAY) as unknown as ArrayBuffer);
+    const lists = wb.getWorksheet('Listas')!;
+    expect([2, 3, 4, 5, 6, 7].map((r) => lists.getCell(`A${r}`).value)).toEqual(
+      ['Grupo 1', 'Grupo 2', 'Grupo 3', 'Grupo 4', 'Grupo 5', 'Grupo 6']);
+    const ws = wb.getWorksheet('Personas')!;
+    for (const ref of ['D2', 'D1001']) {
+      expect(ws.getCell(ref).dataValidation.formulae).toEqual(
+        ['Listas!$A$2:$A$101']);
+    }
+    expect(ws.getCell('L2').dataValidation.formulae).toEqual(['Listas!$D$2:$D$101']);
+  });
+
   it('rechaza archivos que no son Excel o sin encabezados', async () => {
     expect((await readWorkbook(new TextEncoder().encode('hola').buffer as ArrayBuffer)).errors[0]).toContain('No se pudo leer');
     const wb = new ExcelJS.Workbook();
