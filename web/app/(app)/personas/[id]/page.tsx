@@ -7,7 +7,7 @@ import { getPersonDetail, today } from '@/lib/services/persons';
 import { listContactTypes, listDateTypes, listGroups, listMovementTypes, listRoles } from '@/lib/services/catalogs';
 import { allowedMovementTypes } from '@/lib/services/movements';
 import { goalCompliance } from '@/lib/services/metrics';
-import { getSession } from '@/lib/services/session';
+import { can, getSession } from '@/lib/services/session';
 import { ServiceError, check } from '@/lib/services/errors';
 import { fmtDate, fmtNum, fmtPct } from '@/lib/format';
 import { MONTH_NAMES, lastClosedMonth, periodKey, serviceYearMonths } from '@/lib/service-year';
@@ -44,7 +44,12 @@ export default async function PersonaPage({ params, searchParams }: {
   const { person: p, reports, movements } = detail;
   const lastMovement = movements[0];
   const nextTypes = allowedMovementTypes(movementTypes, p.is_active);
-  const canEdit = !!session?.canEdit;
+  const canEditPersons = can(session, 'PERSONAS', 'edit');
+  const canEditMovs = can(session, 'MOVIMIENTOS', 'edit');
+  const canEditReports = can(session, 'INFORMES', 'edit');
+  const canReadPersons = can(session, 'PERSONAS');
+  // Un encargado solo asigna sus grupos
+  const groupOptions = session?.allGroups ? groups : groups.filter((g) => session?.groups.some((s) => s.id === g.id));
   const months = serviceYearMonths(sy);
   const reportOf = new Map(reports.map((r) => [periodKey(r), r]));
   const roleOf = new Map(roleMonths.map((r) => [periodKey(r), r.role_code]));
@@ -61,7 +66,7 @@ export default async function PersonaPage({ params, searchParams }: {
         ) : null}
         <YearSelect value={sy} options={years} />
       </PageHeader>
-      {!canEdit ? <ReadOnlyNote /> : null}
+      {!canEditPersons && !canEditMovs && !canEditReports ? <ReadOnlyNote /> : null}
 
       <section className="grid-2">
         <div className="card">
@@ -102,7 +107,7 @@ export default async function PersonaPage({ params, searchParams }: {
               })}
             </tbody>
           </table>
-          {canEdit ? (
+          {canEditReports ? (
             <ActionForm action={A.saveReportAction} className="inline-form">
               <input type="hidden" name="person_id" value={id} />
               <select name="mes" defaultValue={defaultMonth} aria-label="Mes">
@@ -131,7 +136,7 @@ export default async function PersonaPage({ params, searchParams }: {
                   <td><span className={`badge ${m.direction === 'ALTA' ? 'badge-ok' : 'badge-muted'}`}>{m.direction === 'ALTA' ? 'Alta' : 'Baja'}</span> {m.type_name}</td>
                   <td>{m.congregation ?? '—'}</td>
                   <td>{m.notes}</td>
-                  <td>{canEdit ? (
+                  <td>{canEditMovs ? (
                     <ActionForm action={A.deleteMovementAction}
                       confirm="¿Eliminar este registro? Úsalo solo para corregir errores. Los cargos y el grupo que cerró una baja no se reabren.">
                       <input type="hidden" name="person_id" value={id} /><input type="hidden" name="id" value={m.id} />
@@ -143,7 +148,7 @@ export default async function PersonaPage({ params, searchParams }: {
             </tbody>
           </table>
         )}
-        {canEdit ? (
+        {canEditMovs ? (
           <>
             <ActionForm action={A.addMovementAction} className="inline-form" resetOnSuccess
               confirm={p.is_active ? '¿Registrar la baja? Se cerrarán el cargo y el grupo vigentes el día anterior a la fecha.' : undefined}>
@@ -176,14 +181,14 @@ export default async function PersonaPage({ params, searchParams }: {
                 <tr key={r.id}>
                   <td><strong>{r.role_code}</strong> {r.role_name !== r.role_code ? r.role_name : ''} {r.is_current ? <span className="badge badge-info">vigente</span> : null}</td>
                   <td>{fmtDate(r.start_date)}</td>
-                  <td>{r.end_date ? fmtDate(r.end_date) : canEdit ? (
+                  <td>{r.end_date ? fmtDate(r.end_date) : canEditPersons ? (
                     <ActionForm action={A.closeRoleAction} className="inline-form">
                       <input type="hidden" name="person_id" value={id} /><input type="hidden" name="id" value={r.id} />
                       <input type="date" name="end_date" defaultValue={today()} required aria-label="Fecha de fin" />
                       <SubmitButton className="btn-secondary">Cerrar</SubmitButton>
                     </ActionForm>
                   ) : '—'}</td>
-                  <td>{canEdit ? (
+                  <td>{canEditPersons ? (
                     <ActionForm action={A.deleteRoleAction} confirm="¿Eliminar este periodo de cargo? Úsalo solo para corregir errores; para terminar un cargo, ciérralo.">
                       <input type="hidden" name="person_id" value={id} /><input type="hidden" name="id" value={r.id} />
                       <SubmitButton className="btn-link danger" pendingText="…">Eliminar</SubmitButton>
@@ -194,7 +199,7 @@ export default async function PersonaPage({ params, searchParams }: {
             </tbody>
           </table>
         )}
-        {canEdit ? (
+        {canEditPersons ? (
           <ActionForm action={A.addRoleAction} className="inline-form" resetOnSuccess>
             <input type="hidden" name="person_id" value={id} />
             <select name="role_id" required defaultValue="" aria-label="Cargo">
@@ -219,14 +224,14 @@ export default async function PersonaPage({ params, searchParams }: {
                   <tr key={g.id}>
                     <td>{g.catalog_groups?.name}</td>
                     <td>{fmtDate(g.start_date)}</td>
-                    <td>{g.end_date ? fmtDate(g.end_date) : canEdit ? (
+                    <td>{g.end_date ? fmtDate(g.end_date) : canEditPersons ? (
                       <ActionForm action={A.closeGroupAction} className="inline-form">
                         <input type="hidden" name="person_id" value={id} /><input type="hidden" name="id" value={g.id} />
                         <input type="date" name="end_date" defaultValue={today()} required aria-label="Fecha de fin" />
                         <SubmitButton className="btn-secondary">Cerrar</SubmitButton>
                       </ActionForm>
                     ) : 'vigente'}</td>
-                    <td>{canEdit ? (
+                    <td>{canEditPersons ? (
                       <ActionForm action={A.deleteGroupAction} confirm="¿Eliminar este periodo de grupo?">
                         <input type="hidden" name="person_id" value={id} /><input type="hidden" name="id" value={g.id} />
                         <SubmitButton className="btn-link danger" pendingText="…">Eliminar</SubmitButton>
@@ -237,20 +242,21 @@ export default async function PersonaPage({ params, searchParams }: {
               </tbody>
             </table>
           )}
-          {canEdit ? (
+          {canEditPersons ? (
             <ActionForm action={A.addGroupAction} className="inline-form" resetOnSuccess>
               <input type="hidden" name="person_id" value={id} />
               <select name="group_id" required defaultValue="" aria-label="Grupo">
                 <option value="" disabled>Cambiar a grupo…</option>
-                {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                {groupOptions.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
               </select>
               <label className="inline">Desde <input type="date" name="start_date" required defaultValue={today()} /></label>
               <SubmitButton className="btn-secondary">Asignar</SubmitButton>
             </ActionForm>
           ) : null}
-          {canEdit ? <p className="muted small">Al asignar un grupo nuevo, el grupo vigente se cierra el día anterior.</p> : null}
+          {canEditPersons ? <p className="muted small">Al asignar un grupo nuevo, el grupo vigente se cierra el día anterior.</p> : null}
         </div>
 
+        {canReadPersons ? (
         <div className="card">
           <h2>Contactos y fechas</h2>
           {detail.contacts.length === 0 && detail.dates.length === 0 ? <Empty>Sin contactos ni fechas.</Empty> : null}
@@ -258,7 +264,7 @@ export default async function PersonaPage({ params, searchParams }: {
             {detail.contacts.map((c) => (
               <li key={c.id}>
                 <span className="muted">{c.catalog_contact_types?.name}:</span> {c.value} {c.is_primary ? <span className="badge badge-info">principal</span> : null}
-                {canEdit ? (
+                {canEditPersons ? (
                   <ActionForm action={A.deleteContactAction} className="inline-form right">
                     <input type="hidden" name="person_id" value={id} /><input type="hidden" name="id" value={c.id} />
                     <SubmitButton className="btn-link danger" pendingText="…">Quitar</SubmitButton>
@@ -269,7 +275,7 @@ export default async function PersonaPage({ params, searchParams }: {
             {detail.dates.map((d) => (
               <li key={d.id}>
                 <span className="muted">{d.catalog_date_types?.name}:</span> {fmtDate(d.date_value)}
-                {canEdit ? (
+                {canEditPersons ? (
                   <ActionForm action={A.deleteDateAction} className="inline-form right">
                     <input type="hidden" name="person_id" value={id} /><input type="hidden" name="id" value={d.id} />
                     <SubmitButton className="btn-link danger" pendingText="…">Quitar</SubmitButton>
@@ -278,7 +284,7 @@ export default async function PersonaPage({ params, searchParams }: {
               </li>
             ))}
           </ul>
-          {canEdit ? (
+          {canEditPersons ? (
             <>
               <ActionForm action={A.addContactAction} className="inline-form" resetOnSuccess>
                 <input type="hidden" name="person_id" value={id} />
@@ -302,16 +308,17 @@ export default async function PersonaPage({ params, searchParams }: {
             </>
           ) : null}
         </div>
+        ) : null}
       </section>
 
       <section className="card">
         <h2>Datos personales</h2>
         <ActionForm action={A.updatePersonAction} className="stack">
           <input type="hidden" name="id" value={id} />
-          <PersonFields p={p} disabled={!canEdit} />
-          {canEdit ? <div><SubmitButton>Guardar datos</SubmitButton></div> : null}
+          <PersonFields p={p} disabled={!canEditPersons} />
+          {canEditPersons ? <div><SubmitButton>Guardar datos</SubmitButton></div> : null}
         </ActionForm>
-        {canEdit ? (
+        {canEditPersons ? (
           <ActionForm action={A.deletePersonAction} className="danger-zone"
             confirm="¿Eliminar a esta persona? Solo se puede si se capturó por error y no tiene informes, cargos, grupos ni altas/bajas. Si dejó la congregación, registra una baja.">
             <input type="hidden" name="id" value={id} />

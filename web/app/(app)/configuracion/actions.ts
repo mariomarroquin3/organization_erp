@@ -1,13 +1,13 @@
 'use server';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
-import { requireEditor, requireSession } from '@/lib/services/session';
+import { requireArea } from '@/lib/services/session';
 import * as cat from '@/lib/services/catalogs';
 import { ServiceError } from '@/lib/services/errors';
-import { optNum, optStr, required, runAction, str, type ActionState } from '@/lib/action';
+import { optNum, optStr, required, runAction, type ActionState } from '@/lib/action';
 
 async function editor() {
-  await requireEditor();
+  await requireArea('CONFIGURACION');
   return createClient();
 }
 
@@ -65,17 +65,5 @@ export async function deleteGoalAction(_p: ActionState, fd: FormData): Promise<A
   return runAction(async () => {
     await cat.deleteGoal(await editor(), required(fd, 'id', 'la meta'));
     return done('Meta eliminada.');
-  });
-}
-
-export async function updateUserAction(_p: ActionState, fd: FormData): Promise<ActionState> {
-  return runAction(async () => {
-    const s = await requireSession();
-    if (!s.isSuperadmin) throw new ServiceError('Solo un super administrador puede cambiar cuentas.');
-    await cat.updateAppUser(await createClient(), required(fd, 'id', 'la cuenta'), {
-      system_role_id: required(fd, 'system_role_id', 'el nivel'),
-      is_active: str(fd, 'is_active') === 'on',
-    });
-    return done('Cuenta actualizada.');
   });
 }

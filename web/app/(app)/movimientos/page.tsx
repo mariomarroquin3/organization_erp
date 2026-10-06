@@ -4,8 +4,10 @@ import { Empty, Kpi, PageHeader } from '@/components/ui';
 import { listMovements, summarizeMovements } from '@/lib/services/movements';
 import { fmtDate } from '@/lib/format';
 import { param, yearContext, type SearchParams } from '@/lib/page';
+import { requireAreaPage } from '@/lib/services/session';
 
 export default async function MovimientosPage({ searchParams }: { searchParams: SearchParams }) {
+  await requireAreaPage('MOVIMIENTOS');
   const { db, sp, sy, years } = await yearContext(searchParams);
   const dir = param(sp, 'tipo') === 'altas' ? 'ALTA' : param(sp, 'tipo') === 'bajas' ? 'BAJA' : null;
   const all = await listMovements(db, { serviceYear: sy });

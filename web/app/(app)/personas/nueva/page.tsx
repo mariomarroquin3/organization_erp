@@ -1,29 +1,30 @@
-import { redirect } from 'next/navigation';
 import { ActionForm, SubmitButton } from '@/components/ActionForm';
 import { PageHeader } from '@/components/ui';
 import { createClient } from '@/lib/supabase/server';
 import { listGroups, listMovementTypes } from '@/lib/services/catalogs';
 import { today } from '@/lib/services/persons';
-import { getSession } from '@/lib/services/session';
+import { requireAreaPage } from '@/lib/services/session';
 import { createPersonAction } from '../actions';
 import { PersonFields } from '../PersonFields';
 
 export default async function NuevaPersonaPage() {
-  const session = await getSession();
-  if (!session?.canEdit) redirect('/personas');
+  const session = await requireAreaPage('PERSONAS', 'edit');
   const db = await createClient();
   const [groups, types] = await Promise.all([listGroups(db, { onlyActive: true }), listMovementTypes(db, { onlyActive: true })]);
   const altas = types.filter((t) => t.direction === 'ALTA');
+  // Un encargado solo crea personas en sus grupos (si no, no las vería)
+  const scoped = !session.allGroups;
+  const options = scoped ? groups.filter((g) => session.groups.some((s) => s.id === g.id)) : groups;
   return (
     <>
       <PageHeader title="Nueva persona" />
       <ActionForm action={createPersonAction} className="card stack">
         <PersonFields />
         <div className="form-grid">
-          <label>Grupo (opcional)
-            <select name="group_id" defaultValue="">
-              <option value="">Sin grupo</option>
-              {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+          <label>Grupo{scoped ? '' : ' (opcional)'}
+            <select name="group_id" defaultValue="" required={scoped}>
+              <option value="" disabled={scoped}>{scoped ? 'Elige…' : 'Sin grupo'}</option>
+              {options.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           </label>
           <label>En el grupo desde<input type="date" name="group_start" defaultValue={today()} /></label>

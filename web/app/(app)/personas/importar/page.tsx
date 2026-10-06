@@ -1,13 +1,13 @@
 import { redirect } from 'next/navigation';
 import { PageHeader } from '@/components/ui';
-import { getSession } from '@/lib/services/session';
+import { canEditEveryone, getSession } from '@/lib/services/session';
 import { defaultStartDate } from '@/lib/import/persons';
 import { fmtDate } from '@/lib/format';
 import { ImportForm } from './ImportForm';
 
 export default async function ImportarPersonasPage() {
   const session = await getSession();
-  if (!session?.canEdit) redirect('/personas');
+  if (!canEditEveryone(session)) redirect('/personas');
   return (
     <>
       <PageHeader title="Importar personas desde Excel">

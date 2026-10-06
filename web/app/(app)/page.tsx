@@ -5,8 +5,43 @@ import { dashboard } from '@/lib/services/metrics';
 import { fmtNum, fmtPct, fullName } from '@/lib/format';
 import { monthLabel } from '@/lib/service-year';
 import { yearContext, type SearchParams } from '@/lib/page';
+import { can, requireSession, type Session } from '@/lib/services/session';
+import { AREAS, AREA_INFO, LEVEL_LABEL } from '@/lib/permissions';
+
+const AREA_HREF = {
+  PERSONAS: '/personas', MOVIMIENTOS: '/movimientos', INFORMES: '/informes', METRICAS: '/metricas', CONFIGURACION: '/configuracion',
+} as const;
+
+// Sin acceso a Métricas el panel solo lista las áreas de la cuenta
+function Welcome({ session }: { session: Session }) {
+  const mine = AREAS.filter((a) => session.areas[a]);
+  return (
+    <>
+      <PageHeader title="Inicio" />
+      <section className="card">
+        {mine.length === 0 ? <Empty>Tu cuenta aún no tiene acceso a ninguna área. Pide acceso a un super administrador.</Empty> : (
+          <table className="table">
+            <thead><tr><th>Área</th><th>Acceso</th><th></th></tr></thead>
+            <tbody>
+              {mine.map((a) => (
+                <tr key={a}>
+                  <td><Link href={AREA_HREF[a]}>{AREA_INFO[a].label}</Link></td>
+                  <td>{LEVEL_LABEL[session.areas[a]!]}</td>
+                  <td className="muted">{AREA_INFO[a].description}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {!session.allGroups ? <p className="muted small">Ves a las personas de: {session.groups.map((g) => g.name).join(', ')}.</p> : null}
+      </section>
+    </>
+  );
+}
 
 export default async function DashboardPage({ searchParams }: { searchParams: SearchParams }) {
+  const session = await requireSession();
+  if (!can(session, 'METRICAS')) return <Welcome session={session} />;
   const { db, sy, years } = await yearContext(searchParams);
   const d = await dashboard(db, sy);
   const lastMonth = d.lastMonth

@@ -2,7 +2,8 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { requireEditor } from '@/lib/services/session';
+import { requireArea } from '@/lib/services/session';
+import type { Area } from '@/lib/permissions';
 import * as persons from '@/lib/services/persons';
 import * as movements from '@/lib/services/movements';
 import { savePersonMonth } from '@/lib/services/reports';
@@ -11,8 +12,8 @@ import { optStr, required, runAction, str, type ActionState } from '@/lib/action
 import { parsePeriodKey } from '@/lib/service-year';
 import type { ReportState } from '@/lib/services/report-plan';
 
-async function editor() {
-  await requireEditor();
+async function editor(area: Area = 'PERSONAS') {
+  await requireArea(area);
   return createClient();
 }
 
@@ -34,10 +35,12 @@ function done(id: string, msg: string) {
 export async function createPersonAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   let id = '';
   const res = await runAction(async () => {
-    const db = await editor();
-    id = await persons.createPerson(db, {
+    const session = await requireArea('PERSONAS');
+    const groupId = optStr(fd, 'group_id');
+    if (!session.allGroups && !groupId) throw new ServiceError('Elige uno de tus grupos.');
+    id = await persons.createPerson(await createClient(), {
       ...personInput(fd),
-      group_id: optStr(fd, 'group_id'),
+      group_id: groupId,
       start_date: optStr(fd, 'group_start') ?? undefined,
       alta: optStr(fd, 'alta_type_id') ? {
         movement_type_id: str(fd, 'alta_type_id'),
@@ -73,7 +76,7 @@ export async function deletePersonAction(_p: ActionState, fd: FormData): Promise
 export async function addMovementAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   return runAction(async () => {
     const person_id = required(fd, 'person_id', 'la persona');
-    await movements.addMovement(await editor(), {
+    await movements.addMovement(await editor('MOVIMIENTOS'), {
       person_id,
       movement_type_id: required(fd, 'movement_type_id', 'el motivo'),
       movement_date: required(fd, 'movement_date', 'la fecha'),
@@ -88,7 +91,7 @@ export async function addMovementAction(_p: ActionState, fd: FormData): Promise<
 export async function deleteMovementAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   return runAction(async () => {
     const person_id = required(fd, 'person_id', 'la persona');
-    await movements.deleteMovement(await editor(), required(fd, 'id', 'el registro'));
+    await movements.deleteMovement(await editor('MOVIMIENTOS'), required(fd, 'id', 'el registro'));
     revalidatePath('/', 'layout');
     return done(person_id, 'Registro eliminado.');
   });
@@ -200,7 +203,7 @@ export async function saveReportAction(_p: ActionState, fd: FormData): Promise<A
     const ym = parsePeriodKey(str(fd, 'mes'));
     if (!ym) throw new ServiceError('Elige el mes.');
     const state = str(fd, 'state') as ReportState;
-    const res = await savePersonMonth(await editor(), person_id, ym, { state, hours: str(fd, 'hours'), studies: str(fd, 'studies') });
+    const res = await savePersonMonth(await editor('INFORMES'), person_id, ym, { state, hours: str(fd, 'hours'), studies: str(fd, 'studies') });
     revalidatePath('/', 'layout');
     return res.saved || res.deleted ? 'Informe guardado.' : 'Sin cambios.';
   });

@@ -1,21 +1,42 @@
 import type { ReactNode } from 'react';
-import { Nav } from '@/components/Nav';
-import { requireSession } from '@/lib/services/session';
+import { Nav, type NavLink } from '@/components/Nav';
+import { can, requireSession, type Session } from '@/lib/services/session';
+import type { Area } from '@/lib/permissions';
 import { signOut } from '@/app/login/actions';
 
-const ROLE_LABEL = { SUPERADMIN: 'Super administrador', ADMIN: 'Administrador', READER: 'Lector' } as const;
+// Cada enlace aparece solo si la cuenta puede leer su área
+const LINKS: (NavLink & { area?: Area; superadmin?: boolean })[] = [
+  { href: '/', label: 'Panel' },
+  { href: '/informes', label: 'Informes del mes', area: 'INFORMES' },
+  { href: '/personas', label: 'Personas', area: 'PERSONAS' },
+  { href: '/movimientos', label: 'Altas y bajas', area: 'MOVIMIENTOS' },
+  { href: '/metricas', label: 'Métricas', area: 'METRICAS' },
+  { href: '/informe-anual', label: 'Informe anual', area: 'METRICAS' },
+  { href: '/exportar', label: 'Exportar', area: 'METRICAS' },
+  { href: '/configuracion', label: 'Configuración', area: 'CONFIGURACION' },
+  { href: '/usuarios', label: 'Usuarios', superadmin: true },
+];
+
+function accessLabel(s: Session) {
+  if (!s.role) return 'Sin acceso';
+  if (s.isSuperadmin) return 'Super administrador';
+  return s.allGroups ? 'Todos los grupos' : s.groups.map((g) => g.name).join(', ') || 'Sin grupos';
+}
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const session = await requireSession();
+  const links = LINKS
+    .filter((l) => (l.superadmin ? session.isSuperadmin : !l.area || can(session, l.area)))
+    .map(({ href, label }) => ({ href, label }));
 
   return (
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">ERP de personal</div>
-        <Nav />
+        {session.role ? <Nav links={links} /> : null}
         <div className="whoami">
           <div>{session.email}</div>
-          <div className="muted">{session.role ? ROLE_LABEL[session.role] : 'Sin acceso'}</div>
+          <div className="muted">{accessLabel(session)}</div>
           <form action={signOut}><button className="btn-link" type="submit">Cerrar sesión</button></form>
         </div>
       </aside>

@@ -42,5 +42,5 @@ export function Empty({ children }: { children: ReactNode }) {
 }
 
 export function ReadOnlyNote() {
-  return <p className="note">Tu cuenta es de solo lectura: puedes consultar y exportar, pero no modificar.</p>;
+  return <p className="note">En esta sección tu cuenta es de solo lectura: puedes consultar, pero no modificar.</p>;
 }
