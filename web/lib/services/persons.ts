@@ -87,12 +87,16 @@ export async function createPerson(db: Db, input: PersonInput & {
     if (t.requires_congregation && !alta.congregation) throw new ServiceError(`Para "${t.name}" indica la congregación de origen.`);
     if (alta.movement_date > today()) throw new ServiceError('La fecha de alta no puede ser futura.');
   }
-  const created = check(await db.from('persons').insert(row).select('id').single()) as { id: string };
-  if (alta) await addMovement(db, { person_id: created.id, ...alta, notes: null });
+  // El id se genera aquí: un encargado de grupo aún no puede leer a la
+  // persona (RLS) hasta que tenga grupo, así que no se pide de vuelta.
+  // Primero el grupo y luego el alta, por la misma razón.
+  const id = crypto.randomUUID();
+  check(await db.from('persons').insert({ id, ...row }));
   if (group_id) {
-    await addGroupPeriod(db, { person_id: created.id, group_id, start_date: start_date ?? today(), end_date: null });
+    await addGroupPeriod(db, { person_id: id, group_id, start_date: start_date ?? today(), end_date: null });
   }
-  return created.id;
+  if (alta) await addMovement(db, { person_id: id, ...alta, notes: null });
+  return id;
 }
 
 export async function updatePerson(db: Db, id: string, input: PersonInput) {

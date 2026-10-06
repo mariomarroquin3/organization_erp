@@ -3,11 +3,12 @@ import { Empty, PageHeader } from '@/components/ui';
 import { createClient } from '@/lib/supabase/server';
 import { listPersons } from '@/lib/services/persons';
 import { listGroups, listRoles } from '@/lib/services/catalogs';
-import { getSession } from '@/lib/services/session';
+import { can, canEditEveryone, requireAreaPage } from '@/lib/services/session';
 import { fmtDate } from '@/lib/format';
 import { param, type SearchParams } from '@/lib/page';
 
 export default async function PersonasPage({ searchParams }: { searchParams: SearchParams }) {
+  const session = await requireAreaPage('PERSONAS');
   const sp = await searchParams;
   const f = {
     q: param(sp, 'q') ?? '',
@@ -16,18 +17,17 @@ export default async function PersonasPage({ searchParams }: { searchParams: Sea
     status: (param(sp, 'estado') ?? 'activos') as 'activos' | 'inactivos' | 'todos',
   };
   const db = await createClient();
-  const [rows, groups, roles, session] = await Promise.all([
-    listPersons(db, f), listGroups(db), listRoles(db), getSession(),
-  ]);
+  const [rows, allGroups, roles] = await Promise.all([listPersons(db, f), listGroups(db), listRoles(db)]);
+  const groups = session.allGroups ? allGroups : allGroups.filter((g) => session.groups.some((s) => s.id === g.id));
 
   return (
     <>
       <PageHeader title="Personas">
-        {session?.canEdit ? <>
+        {canEditEveryone(session) ? <>
           <Link className="btn-secondary" href="/personas/reagrupar">Reagrupar</Link>
           <Link className="btn-secondary" href="/personas/importar">Importar desde Excel</Link>
-          <Link className="btn" href="/personas/nueva">+ Nueva persona</Link>
         </> : null}
+        {can(session, 'PERSONAS', 'edit') ? <Link className="btn" href="/personas/nueva">+ Nueva persona</Link> : null}
       </PageHeader>
 
       <form className="toolbar" action="/personas">

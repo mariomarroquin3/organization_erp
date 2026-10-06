@@ -1,7 +1,7 @@
 'use server';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
-import { requireEditor } from '@/lib/services/session';
+import { canEditEveryone, requireSession } from '@/lib/services/session';
 import { checkImport, runImport } from '@/lib/services/import';
 import { ServiceError } from '@/lib/services/errors';
 import type { PreviewRow, RowStatus } from '@/lib/import/persons';
@@ -27,7 +27,7 @@ async function fileFrom(fd: FormData): Promise<ArrayBuffer> {
 export async function importAction(_prev: ImportState, fd: FormData): Promise<ImportState> {
   const base: ImportState = { ok: false, message: '', fileErrors: [], rows: [], counts: null, at: Date.now() };
   try {
-    await requireEditor();
+    if (!canEditEveryone(await requireSession())) throw new Error('Importar requiere editar Personas de todos los grupos.');
     const db = await createClient();
     const result = await checkImport(db, await fileFrom(fd));
     const view = { ...base, fileErrors: result.fileErrors, rows: result.rows, counts: result.counts };

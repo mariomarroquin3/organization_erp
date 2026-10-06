@@ -2,12 +2,14 @@ import Link from 'next/link';
 import { PageHeader, ReadOnlyNote } from '@/components/ui';
 import { createClient } from '@/lib/supabase/server';
 import { getMonthSheet } from '@/lib/services/reports';
-import { getSession } from '@/lib/services/session';
+import { can, requireAreaPage } from '@/lib/services/session';
 import { lastClosedMonth, monthLabel, parsePeriodKey, periodKey, serviceYearOf, shiftMonth } from '@/lib/service-year';
 import { param, type SearchParams } from '@/lib/page';
 import { MonthSheet } from './MonthSheet';
 
 export default async function InformesPage({ searchParams }: { searchParams: SearchParams }) {
+  const session = await requireAreaPage('INFORMES');
+  const canEdit = can(session, 'INFORMES', 'edit');
   const sp = await searchParams;
   const now = new Date();
   const current = { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 };
@@ -15,7 +17,7 @@ export default async function InformesPage({ searchParams }: { searchParams: Sea
   if (periodKey(ym) > periodKey(current)) ym = current;
   const mes = periodKey(ym);
 
-  const [db, session] = [await createClient(), await getSession()];
+  const db = await createClient();
   const rows = await getMonthSheet(db, ym);
   const prev = periodKey(shiftMonth(ym, -1));
   const next = shiftMonth(ym, 1);
@@ -35,9 +37,9 @@ export default async function InformesPage({ searchParams }: { searchParams: Sea
         Año de servicio {serviceYearOf(ym.year, ym.month)}. Quien era PR o PA ese mes debe informar horas (0 si no hubo);
         el resto solo indica si participó.
       </p>
-      {!session?.canEdit ? <ReadOnlyNote /> : null}
+      {!canEdit ? <ReadOnlyNote /> : null}
       {/* key: reinicia el estado del formulario al cambiar de mes */}
-      <MonthSheet key={mes} rows={rows} mes={mes} canEdit={!!session?.canEdit} anio={serviceYearOf(ym.year, ym.month)} />
+      <MonthSheet key={mes} rows={rows} mes={mes} canEdit={canEdit} anio={serviceYearOf(ym.year, ym.month)} />
     </>
   );
 }

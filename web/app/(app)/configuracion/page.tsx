@@ -2,21 +2,17 @@ import Link from 'next/link';
 import { ActionForm, SubmitButton } from '@/components/ActionForm';
 import { Empty, PageHeader, ReadOnlyNote } from '@/components/ui';
 import { createClient } from '@/lib/supabase/server';
-import { listAppUsers, listGoals, listGroups, listRoles, listSystemRoles } from '@/lib/services/catalogs';
-import { requireSession } from '@/lib/services/session';
+import { listGoals, listGroups, listRoles } from '@/lib/services/catalogs';
+import { can, requireAreaPage } from '@/lib/services/session';
 import { currentServiceYear } from '@/lib/service-year';
 import { fmtNum } from '@/lib/format';
 import * as A from './actions';
 
 export default async function ConfiguracionPage() {
-  const session = await requireSession();
+  const session = await requireAreaPage('CONFIGURACION');
   const db = await createClient();
-  const [groups, roles, goals, users, systemRoles] = await Promise.all([
-    listGroups(db), listRoles(db), listGoals(db),
-    session.canEdit ? listAppUsers(db) : Promise.resolve([]),
-    session.isSuperadmin ? listSystemRoles(db) : Promise.resolve([]),
-  ]);
-  const canEdit = session.canEdit;
+  const [groups, roles, goals] = await Promise.all([listGroups(db), listRoles(db), listGoals(db)]);
+  const canEdit = can(session, 'CONFIGURACION', 'edit');
   const hoursRoles = roles.filter((r) => r.requires_hours_report);
 
   return (
@@ -140,41 +136,6 @@ export default async function ConfiguracionPage() {
           <p className="muted small">Las métricas dependen de los códigos exactos PR y PA, y la regla del bautismo de PB y PNB: no los cambies. Quien recibe PB deja de ser PNB el día anterior y no puede volver a serlo.</p>
         </div>
       </section>
-
-      {canEdit ? (
-        <section className="card">
-          <h2>Cuentas de acceso</h2>
-          {users.length === 0 ? <Empty>No hay cuentas.</Empty> : (
-            <table className="table">
-              <thead><tr><th>Nombre</th><th>Nivel</th><th>Activa</th></tr></thead>
-              <tbody>
-                {users.map((u) => session.isSuperadmin ? (
-                  <tr key={u.id}>
-                    <td>{u.display_name ?? u.id}</td>
-                    <td colSpan={2}>
-                      <ActionForm action={A.updateUserAction} className="inline-form">
-                        <input type="hidden" name="id" value={u.id} />
-                        <select name="system_role_id" defaultValue={u.system_role_id} aria-label="Nivel">
-                          {systemRoles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-                        </select>
-                        <label className="inline"><input type="checkbox" name="is_active" defaultChecked={u.is_active} /> Activa</label>
-                        <SubmitButton className="btn-secondary">Guardar</SubmitButton>
-                      </ActionForm>
-                    </td>
-                  </tr>
-                ) : (
-                  <tr key={u.id}><td>{u.display_name ?? u.id}</td><td>{u.catalog_system_roles?.name}</td><td>{u.is_active ? 'Sí' : 'No'}</td></tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-          <p className="muted small">
-            Para dar acceso a alguien nuevo: créale el usuario en Supabase (Authentication → Users → Add user) y luego regístralo en
-            <code> app_users</code> con su nivel (ver README). Lector solo consulta y exporta; Administrador edita datos;
-            Super administrador además gestiona cuentas.
-          </p>
-        </section>
-      ) : null}
     </>
   );
 }

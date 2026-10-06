@@ -5,13 +5,13 @@ import { Empty, PageHeader } from '@/components/ui';
 import { createClient } from '@/lib/supabase/server';
 import { listPersons, today } from '@/lib/services/persons';
 import { listGroups } from '@/lib/services/catalogs';
-import { getSession } from '@/lib/services/session';
+import { can, canEditEveryone, getSession } from '@/lib/services/session';
 import { param, type SearchParams } from '@/lib/page';
 import { reassignAction } from './actions';
 
 export default async function ReagruparPage({ searchParams }: { searchParams: SearchParams }) {
   const session = await getSession();
-  if (!session?.canEdit) redirect('/personas');
+  if (!canEditEveryone(session)) redirect('/personas');
   const sp = await searchParams;
   const groupId = param(sp, 'grupo') ?? '';
   const db = await createClient();
@@ -71,7 +71,7 @@ export default async function ReagruparPage({ searchParams }: { searchParams: Se
             </tbody>
           </table>
         )}
-        {active.length ? (
+        {active.length && can(session, 'CONFIGURACION', 'edit') ? (
           <fieldset className="stack">
             <legend>Grupos que desaparecen (se desactivan al final; deben quedar vacíos)</legend>
             <div className="toolbar">

@@ -7,8 +7,10 @@ import { goalCompliance } from '@/lib/services/metrics';
 import { fmtNum, fmtPct, fullName } from '@/lib/format';
 import { serviceYearLabel } from '@/lib/service-year';
 import { yearContext, type SearchParams } from '@/lib/page';
+import { requireAreaPage } from '@/lib/services/session';
 
 export default async function InformeAnualPage({ searchParams }: { searchParams: SearchParams }) {
+  await requireAreaPage('METRICAS');
   const { db, sy, years } = await yearContext(searchParams);
   const [o, compliance] = await Promise.all([loadAnnualOverview(db, sy), goalCompliance(db, sy)]);
   const link = (format: 'xlsx' | 'pdf') => `/api/export?informe=anual&anio=${sy}&formato=${format}`;

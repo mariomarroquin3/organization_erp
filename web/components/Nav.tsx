@@ -2,22 +2,13 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-const LINKS = [
-  { href: '/', label: 'Panel' },
-  { href: '/informes', label: 'Informes del mes' },
-  { href: '/personas', label: 'Personas' },
-  { href: '/movimientos', label: 'Altas y bajas' },
-  { href: '/metricas', label: 'Métricas' },
-  { href: '/informe-anual', label: 'Informe anual' },
-  { href: '/exportar', label: 'Exportar' },
-  { href: '/configuracion', label: 'Configuración' },
-];
+export interface NavLink { href: string; label: string }
 
-export function Nav() {
+export function Nav({ links }: { links: NavLink[] }) {
   const path = usePathname();
   return (
     <nav className="nav">
-      {LINKS.map((l) => {
+      {links.map((l) => {
         const active = l.href === '/' ? path === '/' : path.startsWith(l.href);
         return <Link key={l.href} href={l.href} className={active ? 'active' : undefined}>{l.label}</Link>;
       })}

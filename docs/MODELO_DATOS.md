@@ -44,7 +44,8 @@ El cargo de cada mes se deduce del historial (`person_roles`), así que alguien 
 | `person_roles` | Exclusion constraint para el mismo cargo; el trigger PR/PA ahora compara rangos completos, no solo periodos abiertos, y bloquea por persona para evitar carreras. |
 | `role_hour_goals` | **Nueva.** Metas por cargo y año de servicio. |
 | `monthly_reports` | **Nueva** (reemplaza `service_hours`). `participated` + `hours` opcional, tope 744 h/mes, columnas generadas `period` y `service_year`. |
-| `app_users` | `person_id` ahora opcional (cuentas técnicas), + `display_name`, `is_active`. Nunca puede quedar sin un SUPERADMIN activo. |
+| `app_users` | `person_id` ahora opcional (cuentas técnicas), + `display_name`, `is_active`, `all_groups` (1200). Nunca puede quedar sin un SUPERADMIN activo. |
+| `app_user_permissions`, `app_user_groups`, `permission_templates` | **Nuevas** (migración 1200). Permisos por área, grupos visibles y plantillas. |
 | `catalog_movement_types`, `person_movements` | **Nuevas** (migración 0800). Altas, bajas y traslados. |
 | `audit_log` | **Nueva.** Bitácora automática de cambios en personas, cargos, grupos, informes, metas y cuentas. |
 
@@ -70,7 +71,17 @@ Desde el cliente: `supabase.from('view_goal_compliance').select().eq('service_ye
 
 ## Seguridad
 
-Igual que el original (SUPERADMIN / ADMIN / READER), más: cuentas desactivables, `anon` sin acceso a tablas ni vistas, bitácora visible solo para ADMIN y SUPERADMIN, funciones con `search_path` fijo.
+Permisos por área y alcance por grupo (migración 1200; antes eran tres niveles SUPERADMIN / ADMIN / READER):
+
+- `SUPERADMIN`: todo, y es el único que gestiona cuentas, permisos, plantillas y ve la bitácora.
+- `USER`: lo que diga `app_user_permissions` por área (`PERSONAS`, `MOVIMIENTOS`, `INFORMES`, `METRICAS`, `CONFIGURACION`), sin fila = sin acceso, `can_edit` = edición. `METRICAS` es solo lectura.
+- Alcance: `app_users.all_groups`, o solo las personas cuyo grupo más reciente está en `app_user_groups`. Aplica a personas, cargos, grupos, contactos, fechas, altas/bajas e informes, y por tanto a todas las vistas, métricas y exportes (son `security_invoker`).
+- Leer cualquier área de datos deja ver nombres, grupos, cargos, altas/bajas e informes de las personas del alcance; contactos y fechas solo con `PERSONAS`. Catálogos: los lee cualquier cuenta y los edita `CONFIGURACION`.
+- Un encargado solo asigna grupos suyos y puede dar el primer grupo a una persona nueva; quien crea a una persona registra su alta inicial aunque no tenga `MOVIMIENTOS`. Importar y reagrupar exigen editar `PERSONAS` con todos los grupos.
+- `permission_templates`: plantillas para crear cuentas (se copian, no quedan ligadas). `fn_save_app_user` y `fn_set_user_area` guardan permisos; `fn_my_access` los devuelve a la app.
+- Las cuentas ADMIN pasaron a USER con edición en todo y las READER a USER con lectura en todo.
+
+Además: cuentas desactivables, `anon` sin acceso a tablas ni vistas, funciones con `search_path` fijo.
 
 ## Decisiones tomadas por defecto (confirmar con Javier)
 

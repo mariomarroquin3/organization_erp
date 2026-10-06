@@ -1,7 +1,7 @@
 'use server';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
-import { requireEditor } from '@/lib/services/session';
+import { requireArea } from '@/lib/services/session';
 import { saveMonthSheet } from '@/lib/services/reports';
 import type { ReportState, SheetEntry } from '@/lib/services/report-plan';
 import { runAction, type ActionState } from '@/lib/action';
@@ -9,7 +9,7 @@ import { parsePeriodKey } from '@/lib/service-year';
 
 export async function saveSheetAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
   return runAction(async () => {
-    await requireEditor();
+    await requireArea('INFORMES');
     const ym = parsePeriodKey(String(fd.get('mes')));
     if (!ym) throw new Error('Mes no válido.');
     const entries: SheetEntry[] = fd.getAll('person_id').map((id) => {

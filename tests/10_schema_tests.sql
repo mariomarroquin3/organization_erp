@@ -243,16 +243,47 @@ rollback;
 -- Seguridad
 -- ---------------------------------------------------------------------
 \echo '== Seguridad =='
+-- Cuentas de prueba (como postgres, sin RLS):
+--   01 super  SUPERADMIN
+--   02 admin  USER, edita todas las áreas, todos los grupos
+--   03 reader USER, lee todas las áreas
+--   04 g2     USER, plantilla "Encargado de grupo" limitada al Grupo 2 (Carla y Diego)
+--   05 inf    USER, solo INFORMES (edición)
+--   06 movs   USER, solo MOVIMIENTOS (edición)
 insert into auth.users (id, email) values
   ('10000000-0000-0000-0000-000000000001', 'super@demo'),
   ('10000000-0000-0000-0000-000000000002', 'admin@demo'),
-  ('10000000-0000-0000-0000-000000000003', 'reader@demo');
-insert into app_users (id, system_role_id, display_name)
-select u.id, csr.id, u.email
-from (values ('10000000-0000-0000-0000-000000000001'::uuid, 'SUPERADMIN', 'super'),
-             ('10000000-0000-0000-0000-000000000002'::uuid, 'ADMIN', 'admin'),
-             ('10000000-0000-0000-0000-000000000003'::uuid, 'READER', 'reader')) u(id, code, email)
+  ('10000000-0000-0000-0000-000000000003', 'reader@demo'),
+  ('10000000-0000-0000-0000-000000000004', 'g2@demo'),
+  ('10000000-0000-0000-0000-000000000005', 'inf@demo'),
+  ('10000000-0000-0000-0000-000000000006', 'movs@demo');
+insert into app_users (id, system_role_id, display_name, all_groups)
+select u.id, csr.id, u.email, u.all_groups
+from (values ('10000000-0000-0000-0000-000000000001'::uuid, 'SUPERADMIN', 'super', true),
+             ('10000000-0000-0000-0000-000000000002'::uuid, 'USER', 'admin', true),
+             ('10000000-0000-0000-0000-000000000003'::uuid, 'USER', 'reader', true),
+             ('10000000-0000-0000-0000-000000000004'::uuid, 'USER', 'g2', false),
+             ('10000000-0000-0000-0000-000000000005'::uuid, 'USER', 'inf', true),
+             ('10000000-0000-0000-0000-000000000006'::uuid, 'USER', 'movs', true)) u(id, code, email, all_groups)
 join catalog_system_roles csr on csr.code = u.code;
+insert into app_user_permissions (user_id, area, can_edit)
+select '10000000-0000-0000-0000-000000000002'::uuid, a, a <> 'METRICAS' from unnest(app_areas()) a
+union all
+select '10000000-0000-0000-0000-000000000003', a, false from unnest(app_areas()) a
+union all
+select '10000000-0000-0000-0000-000000000004', e.key, e.value = 'edit'
+from permission_templates t, jsonb_each_text(t.areas) e where t.name = 'Encargado de grupo'
+union all
+select '10000000-0000-0000-0000-000000000005', 'INFORMES', true
+union all
+select '10000000-0000-0000-0000-000000000006', 'MOVIMIENTOS', true;
+insert into app_user_groups (user_id, group_id) values
+  ('10000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-0000000000a2');
+insert into person_contacts (person_id, contact_type_id, value, is_primary)
+select '00000000-0000-0000-0000-000000000004', id, '555-0004', true from catalog_contact_types where code = 'PHONE';
+
+select pg_temp.check((select count(*) = 0 from catalog_system_roles where code in ('ADMIN', 'READER')),
+                     'ya no existen los niveles ADMIN y READER');
 
 -- anon no ve nada (ni tablas ni vistas)
 begin;
@@ -266,51 +297,79 @@ begin;
 set local role authenticated;
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-0000000000ff';
 select pg_temp.check((select count(*) = 0 from persons), 'usuario sin cuenta en app_users no ve personas');
+select pg_temp.check(fn_my_access() is null, 'sin cuenta: fn_my_access es NULL');
 rollback;
 
--- READER: lee todo, no escribe, ve solo su cuenta
+-- Lector: lee todo, no escribe, ve solo su cuenta
 begin;
 set local role authenticated;
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000003';
-select pg_temp.check((select count(*) = 4 from persons), 'READER lee personas');
-select pg_temp.check((select count(*) = 3 from view_goal_compliance where service_year = 2026), 'READER lee cumplimiento (vista respeta RLS)');
-select pg_temp.check((select count(*) = 1 from app_users), 'READER solo ve su cuenta');
+select pg_temp.check((select count(*) = 4 from persons), 'lector lee personas');
+select pg_temp.check((select count(*) = 1 from person_contacts), 'lector con PERSONAS lee contactos');
+select pg_temp.check((select count(*) = 3 from view_goal_compliance where service_year = 2026), 'lector lee cumplimiento (vista respeta RLS)');
+select pg_temp.check((select count(*) = 1 from app_users), 'lector solo ve su cuenta');
+select pg_temp.check((select count(*) = 5 from app_user_permissions), 'lector ve sus propios permisos');
+select pg_temp.check((select count(*) = 0 from permission_templates), 'lector no ve plantillas');
 select pg_temp.expect_error($$insert into persons (first_name, last_name) values ('X', 'Y')$$, '%row-level security%');
-select pg_temp.check((select count(*) = 0 from audit_log), 'READER no ve la bitácora');
-select pg_temp.check((select count(*) = 8 from catalog_movement_types), 'READER lee tipos de alta/baja (incluye Sacado)');
+select pg_temp.check((select count(*) = 0 from audit_log), 'lector no ve la bitácora');
+select pg_temp.check((select count(*) = 8 from catalog_movement_types), 'lector lee tipos de alta/baja (incluye Sacado)');
 select pg_temp.expect_error($$select pg_temp.mov('00000000-0000-0000-0000-000000000004', 'OTRA_BAJA', '2026-03-01')$$, '%row-level security%');
+select pg_temp.expect_error($$insert into catalog_groups (name) values ('Nuevo')$$, '%row-level security%');
+select pg_temp.check((fn_my_access()->'areas') = '{"PERSONAS":"read","MOVIMIENTOS":"read","INFORMES":"read","METRICAS":"read","CONFIGURACION":"read"}'::jsonb,
+                     'fn_my_access del lector: lectura en las cinco áreas');
 rollback;
 
--- ADMIN: escribe datos, ve cuentas, no las modifica
+-- Administrador (USER con edición en todo): escribe datos, no gestiona cuentas
 begin;
 set local role authenticated;
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000002';
 insert into persons (first_name, last_name) values ('Nueva', 'Persona');
-select pg_temp.check((select count(*) = 3 from app_users), 'ADMIN ve todas las cuentas');
+insert into catalog_groups (name) values ('Grupo 3');
+select pg_temp.check((select count(*) = 1 from app_users), 'administrador solo ve su cuenta');
 update app_users set display_name = 'hack' where id = '10000000-0000-0000-0000-000000000003';
+select pg_temp.expect_error($$insert into app_user_permissions (user_id, area, can_edit)
+  values ('10000000-0000-0000-0000-000000000003', 'PERSONAS', true)$$, '%row-level security%');
+select pg_temp.expect_error($$select fn_set_user_area('10000000-0000-0000-0000-000000000003', 'PERSONAS', 'edit')$$, '%Solo un super administrador%');
+reset role;
 select pg_temp.check((select display_name from app_users where id = '10000000-0000-0000-0000-000000000003') = 'reader',
-                     'ADMIN no puede modificar cuentas');
+                     'administrador no puede modificar cuentas');
 select pg_temp.check((select count(*) > 0 from audit_log where table_name = 'persons'
                         and changed_by = '10000000-0000-0000-0000-000000000002'),
                      'La bitácora registra quién creó la persona');
 rollback;
 
--- SUPERADMIN: gestiona cuentas, pero no puede dejar el sistema sin SUPERADMIN
+-- Super administrador: gestiona cuentas, permisos y plantillas
 begin;
 set local role authenticated;
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
-update app_users set system_role_id = (select id from catalog_system_roles where code = 'ADMIN')
- where id = '10000000-0000-0000-0000-000000000003';
-select pg_temp.check((select count(*) = 2 from app_users a join catalog_system_roles c on c.id = a.system_role_id where c.code = 'ADMIN'),
-                     'SUPERADMIN asciende a READER a ADMIN');
+select pg_temp.check((select count(*) = 6 from app_users), 'super ve todas las cuentas');
+select pg_temp.check((select count(*) = 5 from permission_templates), 'super ve las plantillas');
+select fn_save_app_user('10000000-0000-0000-0000-000000000003', 'Lectora', false, true, false,
+                        array['00000000-0000-0000-0000-0000000000a1']::uuid[], '{"PERSONAS":"edit","METRICAS":"read"}');
+select pg_temp.check((select count(*) = 2 from app_user_permissions where user_id = '10000000-0000-0000-0000-000000000003'),
+                     'fn_save_app_user reemplaza los permisos');
+select pg_temp.check((select not all_groups and display_name = 'Lectora' from app_users where id = '10000000-0000-0000-0000-000000000003'),
+                     'fn_save_app_user guarda nombre y alcance');
+select pg_temp.expect_error($$select fn_save_app_user('10000000-0000-0000-0000-000000000003', 'x', false, true, false, '{}', '{}')$$,
+                            '%al menos un grupo%');
+select pg_temp.expect_error($$select fn_save_app_user('10000000-0000-0000-0000-000000000003', 'x', false, true, true, '{}', '{"METRICAS":"edit"}')$$,
+                            '%Permisos inválidos%');
+select fn_set_user_area('10000000-0000-0000-0000-000000000004', 'INFORMES', null);
+select fn_set_user_area('10000000-0000-0000-0000-000000000004', 'CONFIGURACION', 'read');
+select pg_temp.check((select string_agg(area || ':' || can_edit, ',' order by area) from app_user_permissions
+                       where user_id = '10000000-0000-0000-0000-000000000004')
+                     = 'CONFIGURACION:false,METRICAS:false,MOVIMIENTOS:false,PERSONAS:true',
+                     'el interruptor quita INFORMES y da lectura de CONFIGURACION');
+select pg_temp.expect_error($$select fn_set_user_area('10000000-0000-0000-0000-000000000001', 'INFORMES', null)$$, '%acceso a todo%');
+select pg_temp.expect_error($$insert into permission_templates (name, areas) values ('Mala', '{"METRICAS":"edit"}')$$, '%permission_templates_areas_check%');
+insert into permission_templates (name, areas, group_scoped) values ('Auxiliar', '{"INFORMES":"edit"}', true);
 rollback;
 
 select pg_temp.expect_error($$
   do $d$ begin
     set local role authenticated;
     set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
-    update app_users set system_role_id = (select id from catalog_system_roles where code = 'READER')
-     where id = '10000000-0000-0000-0000-000000000001';
+    perform fn_save_app_user('10000000-0000-0000-0000-000000000001', 'super', false, true, true, '{}', '{}');
     set constraints all immediate;
   end $d$
 $$, '%al menos un SUPERADMIN%');
@@ -321,6 +380,64 @@ update app_users set is_active = false where id = '10000000-0000-0000-0000-00000
 set local role authenticated;
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000003';
 select pg_temp.check((select count(*) = 0 from persons), 'cuenta desactivada no ve datos');
+select pg_temp.check(fn_my_access() is null, 'cuenta desactivada: fn_my_access es NULL');
+rollback;
+
+-- Encargado del Grupo 2: solo ve y edita a Carla y Diego
+begin;
+set local role authenticated;
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000004';
+select pg_temp.check((select string_agg(first_name, ',' order by first_name) from persons) = 'Carla,Diego', 'encargado ve solo su grupo');
+select pg_temp.check((select count(distinct person_id) = 2 from fn_report_matrix(2026)), 'la matriz del informe solo trae su grupo');
+select pg_temp.check((select count(*) = 0 from view_goal_compliance where first_name in ('Ana', 'Beto')), 'no ve el cumplimiento de otro grupo');
+select pg_temp.check((select count(*) = 1 from person_contacts), 've contactos de su grupo');
+select pg_temp.check((select (fn_my_access()->'groups'->0->>'name') = 'Grupo 2' and not (fn_my_access()->>'all_groups')::boolean),
+                     'fn_my_access trae su grupo');
+insert into monthly_reports (person_id, year, month, participated)
+values ('00000000-0000-0000-0000-000000000004', 2026, 9, true);
+select pg_temp.expect_error($$insert into monthly_reports (person_id, year, month, participated, hours)
+  values ('00000000-0000-0000-0000-000000000001', 2026, 9, true, 10)$$, '%row-level security%');
+update persons set notes = 'hack' where id = '00000000-0000-0000-0000-000000000001';
+select pg_temp.expect_error($$insert into person_group_history (person_id, group_id, start_date)
+  values ('00000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-0000000000a1', '2026-09-01')$$, '%row-level security%');
+select pg_temp.expect_error($$select fn_import_persons('[{"row": 2, "first_name": "X", "last_name": "Y"}]')$$, '%No tienes permiso%');
+select pg_temp.expect_error($$select fn_reassign_groups('2026-09-01', '[]')$$, '%No tienes permiso%');
+-- Alta de una persona nueva en su grupo, con su alta inicial
+insert into persons (id, first_name, last_name) values ('00000000-0000-0000-0000-0000000000e1', 'Eva', 'Nueva');
+select pg_temp.expect_error($$insert into person_group_history (person_id, group_id, start_date)
+  values ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000a1', '2026-09-01')$$, '%row-level security%');
+insert into person_group_history (person_id, group_id, start_date)
+values ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000a2', '2026-09-01');
+select pg_temp.mov('00000000-0000-0000-0000-0000000000e1', 'NUEVO_INGRESO', '2026-09-01');
+select pg_temp.check((select count(*) = 3 from persons), 've a la persona que acaba de crear');
+-- Sin MOVIMIENTOS (edición) no registra bajas
+select pg_temp.expect_error($$select pg_temp.mov('00000000-0000-0000-0000-0000000000e1', 'OTRA_BAJA', '2026-09-20')$$, '%row-level security%');
+reset role;
+select pg_temp.check((select notes is distinct from 'hack' from persons where id = '00000000-0000-0000-0000-000000000001'),
+                     'no puede editar a alguien de otro grupo');
+rollback;
+
+-- Solo INFORMES: captura informes, no ve contactos ni edita personas
+begin;
+set local role authenticated;
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000005';
+select pg_temp.check((select count(*) = 4 from persons), 'capturista ve los nombres de todos');
+select pg_temp.check((select count(*) = 0 from person_contacts), 'sin PERSONAS no ve contactos');
+insert into monthly_reports (person_id, year, month, participated)
+values ('00000000-0000-0000-0000-000000000004', 2026, 9, true);
+select pg_temp.expect_error($$insert into persons (first_name, last_name) values ('X', 'Y')$$, '%row-level security%');
+select pg_temp.check((fn_my_access()->'areas') = '{"INFORMES":"edit"}'::jsonb, 'fn_my_access: solo INFORMES');
+rollback;
+
+-- Solo MOVIMIENTOS: la baja cierra cargo y grupo aunque no edite PERSONAS
+begin;
+set local role authenticated;
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000006';
+select pg_temp.mov('00000000-0000-0000-0000-000000000001', 'OTRA_BAJA', '2026-09-15');
+reset role;
+select pg_temp.check((select not is_active from persons where id = '00000000-0000-0000-0000-000000000001'), 'la baja deja inactiva a Ana');
+select pg_temp.check((select count(*) = 0 from person_roles where person_id = '00000000-0000-0000-0000-000000000001' and end_date is null),
+                     'la baja cerró sus cargos');
 rollback;
 
 -- ---------------------------------------------------------------------

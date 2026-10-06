@@ -5,6 +5,7 @@ import { goalCompliance, isWithoutHoursRole, monthlySummary, serviceYearSummary 
 import { STATUS_LABEL, fmtNum, fmtPct, fullName } from '@/lib/format';
 import { MONTH_SHORT } from '@/lib/service-year';
 import { param, yearContext, type SearchParams } from '@/lib/page';
+import { requireAreaPage } from '@/lib/services/session';
 
 const TABS = [
   { key: 'cumplimiento', label: 'Metas PR / PA' },
@@ -13,6 +14,7 @@ const TABS = [
 ] as const;
 
 export default async function MetricasPage({ searchParams }: { searchParams: SearchParams }) {
+  await requireAreaPage('METRICAS');
   const { db, sp, sy, years } = await yearContext(searchParams);
   const tab = TABS.find((t) => t.key === param(sp, 'vista'))?.key ?? 'cumplimiento';
   const href = (extra: Record<string, string>) => `/metricas?${new URLSearchParams({ anio: String(sy), vista: tab, ...extra })}`;

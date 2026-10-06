@@ -1,5 +1,5 @@
 import type { Db } from '@/lib/supabase/server';
-import type { CatalogGroup, CatalogRole, CatalogType, MovementType, RoleHourGoal, AppUser } from '@/lib/types';
+import type { CatalogGroup, CatalogRole, CatalogType, MovementType, RoleHourGoal } from '@/lib/types';
 import { check } from './errors';
 
 export async function listGroups(db: Db, { onlyActive = false } = {}) {
@@ -69,18 +69,4 @@ export async function saveGoal(db: Db, g: {
 
 export async function deleteGoal(db: Db, id: string) {
   check(await db.from('role_hour_goals').delete().eq('id', id));
-}
-
-export async function listAppUsers(db: Db) {
-  return check(await db.from('app_users')
-    .select('id, person_id, display_name, is_active, system_role_id, catalog_system_roles(code, name)')
-    .order('display_name')) as unknown as AppUser[];
-}
-
-export async function listSystemRoles(db: Db) {
-  return check(await db.from('catalog_system_roles').select('id, code, name').order('code')) as CatalogType[];
-}
-
-export async function updateAppUser(db: Db, id: string, patch: { system_role_id: string; is_active: boolean }) {
-  check(await db.from('app_users').update(patch).eq('id', id));
 }

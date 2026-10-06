@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getSession } from '@/lib/services/session';
+import { can, getSession } from '@/lib/services/session';
 import { buildAnnual, buildTables } from '@/lib/export/build';
 import { REPORT_KEYS, type ReportKey } from '@/lib/export/tables';
 import { toXlsx } from '@/lib/export/xlsx';
@@ -19,6 +19,10 @@ export async function GET(req: NextRequest) {
   const format = q.get('formato') === 'pdf' ? 'pdf' : 'xlsx';
   if (key !== 'todo' && key !== 'anual' && !REPORT_KEYS.includes(key as ReportKey)) {
     return NextResponse.json({ error: 'Informe desconocido' }, { status: 400 });
+  }
+  // Métricas exporta todo; Altas y bajas solo su listado
+  if (!can(session, 'METRICAS') && !(key === 'movimientos' && can(session, 'MOVIMIENTOS'))) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
   }
   const sy = parseServiceYear(q.get('anio'));
 

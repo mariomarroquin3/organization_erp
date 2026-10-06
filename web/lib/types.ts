@@ -2,7 +2,7 @@
 // supabase/migrations. Se mantienen a mano: si cambia una vista,
 // actualizar aquí.
 
-export type SystemRole = 'SUPERADMIN' | 'ADMIN' | 'READER';
+export type SystemRole = 'SUPERADMIN' | 'USER';
 
 export type ComplianceStatus = 'CUMPLIDA' | 'AL DIA' | 'ATRASADO' | 'NO CUMPLIDA' | 'SIN META';
 
@@ -89,11 +89,6 @@ export interface RoleHourGoal {
   id: string; role_id: string; effective_from_sy: number;
   annual_hours: number | null; monthly_hours: number | null; notes: string | null;
   catalog_roles: { code: string; name: string } | null;
-}
-
-export interface AppUser {
-  id: string; person_id: string | null; display_name: string | null; is_active: boolean;
-  system_role_id: string; catalog_system_roles: { code: SystemRole; name: string } | null;
 }
 
 export type MovementDirection = 'ALTA' | 'BAJA';

@@ -2,6 +2,7 @@ import { YearSelect } from '@/components/YearSelect';
 import { PageHeader } from '@/components/ui';
 import { REPORTS, REPORT_KEYS } from '@/lib/export/tables';
 import { yearContext, type SearchParams } from '@/lib/page';
+import { requireAreaPage } from '@/lib/services/session';
 
 const DESCRIPTIONS: Record<string, string> = {
   cumplimiento: 'Horas, meta, avance y estado de cada PR y PA.',
@@ -13,6 +14,7 @@ const DESCRIPTIONS: Record<string, string> = {
 };
 
 export default async function ExportarPage({ searchParams }: { searchParams: SearchParams }) {
+  await requireAreaPage('METRICAS');
   const { sy, years } = await yearContext(searchParams);
   const link = (key: string, format: 'xlsx' | 'pdf') => `/api/export?informe=${key}&anio=${sy}&formato=${format}`;
   return (

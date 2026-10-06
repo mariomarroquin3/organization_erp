@@ -90,12 +90,10 @@ Pruebas: `npm test` (unitarias), `npm run typecheck` y `npm run build`.
 
 1. Aplica las migraciones en Supabase y crea el primer SUPERADMIN (sección anterior).
 2. En Supabase, Authentication > Providers: deja Email habilitado y desactiva "Allow new users to sign up" para que solo entren las cuentas que crees.
-3. Importa el repositorio en Vercel con **Root Directory = `web`** y define `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+3. Importa el repositorio en Vercel con **Root Directory = `web`** y define `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY`.
 
-Para dar acceso a otra persona: créala en Authentication > Users y registra su cuenta (nivel `ADMIN` o `READER`):
+`SUPABASE_SERVICE_ROLE_KEY` (Supabase > Project Settings > API > `service_role`) permite crear usuarios y cambiar contraseñas desde la pantalla **Usuarios**. Es secreta: va sin `NEXT_PUBLIC_` para que nunca llegue al navegador y la app solo la usa para Supabase Auth, nunca para leer datos. Sin ella, la pantalla igual gestiona permisos, pero el usuario hay que crearlo a mano en Authentication > Users (luego se le da acceso con su correo desde la app).
 
-```sql
-insert into app_users (id, system_role_id, display_name, person_id)
-select '<uuid-del-usuario>', id, 'Nombre', null   -- person_id opcional
-from catalog_system_roles where code = 'READER';
-```
+### Usuarios y permisos
+
+Solo el super administrador ve **Usuarios**. Cada cuenta tiene un interruptor por área (Personas, Altas y bajas, Informes del mes, Métricas, Configuración) con lectura o edición, y un alcance: todas las personas o solo las de ciertos grupos. Las plantillas (Administrador, Lector, Capturista de informes, Encargado de grupo, Solo personas) llenan los permisos al crear un usuario. Todo se aplica en la base con RLS (migración 1200), no solo en la interfaz.
