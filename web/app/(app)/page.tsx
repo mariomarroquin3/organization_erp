@@ -9,7 +9,7 @@ import { can, requireSession, type Session } from '@/lib/services/session';
 import { AREAS, AREA_INFO, LEVEL_LABEL } from '@/lib/permissions';
 
 const AREA_HREF = {
-  PERSONAS: '/personas', MOVIMIENTOS: '/movimientos', INFORMES: '/informes', METRICAS: '/metricas', CONFIGURACION: '/configuracion',
+  PERSONAS: '/personas', MOVIMIENTOS: '/movimientos', INFORMES: '/informes', METRICAS: '/metricas', CONFIGURACION: '/configuracion', USUARIOS: '/usuarios',
 } as const;
 
 // Sin acceso a Métricas el panel solo lista las áreas de la cuenta

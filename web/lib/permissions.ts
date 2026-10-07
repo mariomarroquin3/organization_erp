@@ -1,7 +1,7 @@
 // Áreas de la app y permisos. Las mismas reglas se aplican en la base
 // (migración 1200, RLS); aquí solo deciden qué se muestra.
 
-export const AREAS = ['PERSONAS', 'MOVIMIENTOS', 'INFORMES', 'METRICAS', 'CONFIGURACION'] as const;
+export const AREAS = ['PERSONAS', 'MOVIMIENTOS', 'INFORMES', 'METRICAS', 'CONFIGURACION', 'USUARIOS'] as const;
 export type Area = (typeof AREAS)[number];
 export type Level = 'read' | 'edit';
 export type AreaMap = Partial<Record<Area, Level>>;
@@ -12,6 +12,7 @@ export const AREA_INFO: Record<Area, { label: string; description: string; edita
   INFORMES: { label: 'Informes del mes', description: 'Capturar participación, horas y cursos', editable: true },
   METRICAS: { label: 'Métricas', description: 'Panel, métricas, informe anual y exportes', editable: false },
   CONFIGURACION: { label: 'Configuración', description: 'Grupos, cargos y metas de horas', editable: true },
+  USUARIOS: { label: 'Usuarios', description: 'Ver o crear cuentas y cambiar permisos (no da acceso a datos)', editable: true },
 };
 
 export const LEVEL_LABEL: Record<Level, string> = { read: 'Lectura', edit: 'Edición' };

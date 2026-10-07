@@ -1,7 +1,7 @@
 'use server';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
-import { requireSuperadmin } from '@/lib/services/session';
+import { requireArea } from '@/lib/services/session';
 import * as users from '@/lib/services/users';
 import { ServiceError } from '@/lib/services/errors';
 import { AREAS, AREA_INFO, isArea, type AreaMap, type Level } from '@/lib/permissions';
@@ -38,7 +38,7 @@ function done(msg: string) {
 
 export async function createUserAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   return runAction(async () => {
-    await requireSuperadmin();
+    await requireArea('USUARIOS');
     const email = required(fd, 'email', 'el correo').toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ServiceError('El correo no es válido.');
     const r = await users.createUser(await createClient(), {
@@ -52,7 +52,7 @@ export async function createUserAction(_p: ActionState, fd: FormData): Promise<A
 
 export async function saveUserAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   return runAction(async () => {
-    await requireSuperadmin();
+    await requireArea('USUARIOS');
     await users.saveAccess(await createClient(), required(fd, 'id', 'la cuenta'), optStr(fd, 'display_name'),
       fd.get('is_active') === 'on', accessFrom(fd));
     return done('Permisos guardados.');
@@ -61,7 +61,7 @@ export async function saveUserAction(_p: ActionState, fd: FormData): Promise<Act
 
 export async function setPasswordAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   return runAction(async () => {
-    await requireSuperadmin();
+    await requireArea('USUARIOS');
     await users.setPassword(required(fd, 'id', 'la cuenta'), password(fd));
     return done('Contraseña cambiada.');
   });
@@ -70,7 +70,7 @@ export async function setPasswordAction(_p: ActionState, fd: FormData): Promise<
 /** Interruptor de un área desde la tabla de usuarios. */
 export async function setAreaAction(userId: string, area: string, level: Level | null): Promise<ActionState> {
   return runAction(async () => {
-    await requireSuperadmin();
+    await requireArea('USUARIOS');
     if (!isArea(area)) throw new ServiceError('Área desconocida.');
     await users.setArea(await createClient(), userId, area, level);
     return done(level ? `${AREA_INFO[area].label}: ${level === 'edit' ? 'edición' : 'lectura'}.` : `${AREA_INFO[area].label}: sin acceso.`);
@@ -79,7 +79,7 @@ export async function setAreaAction(userId: string, area: string, level: Level |
 
 export async function saveTemplateAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   return runAction(async () => {
-    await requireSuperadmin();
+    await requireArea('USUARIOS');
     const areas = areasFrom(fd);
     if (Object.keys(areas).length === 0) throw new ServiceError('Activa al menos un área.');
     await users.saveTemplate(await createClient(), {
@@ -95,7 +95,7 @@ export async function saveTemplateAction(_p: ActionState, fd: FormData): Promise
 
 export async function deleteTemplateAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   return runAction(async () => {
-    await requireSuperadmin();
+    await requireArea('USUARIOS');
     await users.deleteTemplate(await createClient(), required(fd, 'id', 'la plantilla'));
     return done('Plantilla eliminada.');
   });

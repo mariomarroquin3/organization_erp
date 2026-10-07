@@ -7,13 +7,14 @@ import { createClient } from '@/lib/supabase/server';
 import { hasServiceRole } from '@/lib/supabase/admin';
 import { listGroups } from '@/lib/services/catalogs';
 import { listTemplates, listUsers } from '@/lib/services/users';
-import { requireSession } from '@/lib/services/session';
+import { requireAreaPage } from '@/lib/services/session';
 import * as A from '../actions';
 
 export default async function UsuarioPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await requireSession();
-  if (!session.isSuperadmin) redirect('/');
+  const session = await requireAreaPage('USUARIOS', 'edit');
   const { id } = await params;
+  // Nadie cambia su propia cuenta desde aquí (la base también lo impide)
+  if (id === session.userId) redirect('/usuarios');
   const db = await createClient();
   const [users, templates, groups] = await Promise.all([listUsers(db), listTemplates(db), listGroups(db)]);
   const u = users.find((x) => x.id === id);
@@ -36,7 +37,7 @@ export default async function UsuarioPage({ params }: { params: Promise<{ id: st
         <label className="inline"><input type="checkbox" name="is_active" defaultChecked={u.isActive} /> Cuenta activa (si la desactivas ya no puede entrar a ver datos)</label>
         <AccessFields
           initial={{ superadmin: u.superadmin, scope: u.allGroups ? 'all' : 'groups', groupIds: u.groupIds, areas: u.areas }}
-          groups={groupOptions} templates={templates} allowSuperadmin
+          groups={groupOptions} templates={templates} allowSuperadmin={session.isSuperadmin}
         />
         <div><SubmitButton>Guardar</SubmitButton></div>
       </ActionForm>

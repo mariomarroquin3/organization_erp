@@ -73,8 +73,8 @@ Desde el cliente: `supabase.from('view_goal_compliance').select().eq('service_ye
 
 Permisos por área y alcance por grupo (migración 1200; antes eran tres niveles SUPERADMIN / ADMIN / READER):
 
-- `SUPERADMIN`: todo, y es el único que gestiona cuentas, permisos, plantillas y ve la bitácora.
-- `USER`: lo que diga `app_user_permissions` por área (`PERSONAS`, `MOVIMIENTOS`, `INFORMES`, `METRICAS`, `CONFIGURACION`), sin fila = sin acceso, `can_edit` = edición. `METRICAS` es solo lectura.
+- `SUPERADMIN`: todo, incluida la bitácora. Además puede gestionar cuentas quien tenga el área `USUARIOS` (migración 1300), sin ver datos de personas, sin tocar cuentas SUPERADMIN ni la propia y sin poder crear SUPERADMIN.
+- `USER`: lo que diga `app_user_permissions` por área (`PERSONAS`, `MOVIMIENTOS`, `INFORMES`, `METRICAS`, `CONFIGURACION`, `USUARIOS`), sin fila = sin acceso, `can_edit` = edición. `METRICAS` es solo lectura.
 - Alcance: `app_users.all_groups`, o solo las personas cuyo grupo más reciente está en `app_user_groups`. Aplica a personas, cargos, grupos, contactos, fechas, altas/bajas e informes, y por tanto a todas las vistas, métricas y exportes (son `security_invoker`).
 - Leer cualquier área de datos deja ver nombres, grupos, cargos, altas/bajas e informes de las personas del alcance; contactos y fechas solo con `PERSONAS`. Catálogos: los lee cualquier cuenta y los edita `CONFIGURACION`.
 - Un encargado solo asigna grupos suyos y puede dar el primer grupo a una persona nueva; quien crea a una persona registra su alta inicial aunque no tenga `MOVIMIENTOS`. Importar y reagrupar exigen editar `PERSONAS` con todos los grupos.

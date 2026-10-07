@@ -5,7 +5,9 @@ import { AREA_INFO, type Area, type Level } from '@/lib/permissions';
 import { Switch } from './AccessFields';
 
 /** Celda de la tabla de usuarios: activa/desactiva un área y cambia lectura/edición al momento. */
-export function AreaToggle({ userId, area, level: initial }: { userId: string; area: Area; level: Level | null }) {
+export function AreaToggle({ userId, area, level: initial, readOnly = false }: {
+  userId: string; area: Area; level: Level | null; readOnly?: boolean;
+}) {
   const [level, setLevel] = useState(initial);
   const [error, setError] = useState('');
   const [pending, start] = useTransition();
@@ -23,14 +25,14 @@ export function AreaToggle({ userId, area, level: initial }: { userId: string; a
 
   return (
     <span className="toggle-cell">
-      <Switch on={!!level} disabled={pending} label={`${info.label}: ${level ? 'con acceso' : 'sin acceso'}`}
+      <Switch on={!!level} disabled={pending || readOnly} label={`${info.label}: ${level ? 'con acceso' : 'sin acceso'}`}
         onChange={(on) => change(on ? 'read' : null)} />
-      {level && info.editable ? (
+      {level && info.editable && !readOnly ? (
         <button type="button" className={`level-chip${level === 'edit' ? ' edit' : ''}`} disabled={pending}
           title="Cambiar entre lectura y edición" onClick={() => change(level === 'edit' ? 'read' : 'edit')}>
           {level === 'edit' ? 'Edición' : 'Lectura'}
         </button>
-      ) : level ? <span className="level-chip">Lectura</span> : null}
+      ) : level ? <span className={`level-chip${level === 'edit' ? ' edit' : ''}`}>{level === 'edit' ? 'Edición' : 'Lectura'}</span> : null}
       {error ? <span className="msg-error small" role="alert">{error}</span> : null}
     </span>
   );

@@ -267,9 +267,9 @@ from (values ('10000000-0000-0000-0000-000000000001'::uuid, 'SUPERADMIN', 'super
              ('10000000-0000-0000-0000-000000000006'::uuid, 'USER', 'movs', true)) u(id, code, email, all_groups)
 join catalog_system_roles csr on csr.code = u.code;
 insert into app_user_permissions (user_id, area, can_edit)
-select '10000000-0000-0000-0000-000000000002'::uuid, a, a <> 'METRICAS' from unnest(app_areas()) a
+select '10000000-0000-0000-0000-000000000002'::uuid, a, a <> 'METRICAS' from unnest(app_areas()) a where a <> 'USUARIOS'
 union all
-select '10000000-0000-0000-0000-000000000003', a, false from unnest(app_areas()) a
+select '10000000-0000-0000-0000-000000000003', a, false from unnest(app_areas()) a where a <> 'USUARIOS'
 union all
 select '10000000-0000-0000-0000-000000000004', e.key, e.value = 'edit'
 from permission_templates t, jsonb_each_text(t.areas) e where t.name = 'Encargado de grupo'
@@ -329,7 +329,7 @@ select pg_temp.check((select count(*) = 1 from app_users), 'administrador solo v
 update app_users set display_name = 'hack' where id = '10000000-0000-0000-0000-000000000003';
 select pg_temp.expect_error($$insert into app_user_permissions (user_id, area, can_edit)
   values ('10000000-0000-0000-0000-000000000003', 'PERSONAS', true)$$, '%row-level security%');
-select pg_temp.expect_error($$select fn_set_user_area('10000000-0000-0000-0000-000000000003', 'PERSONAS', 'edit')$$, '%Solo un super administrador%');
+select pg_temp.expect_error($$select fn_set_user_area('10000000-0000-0000-0000-000000000003', 'PERSONAS', 'edit')$$, '%No tienes permiso para gestionar cuentas%');
 reset role;
 select pg_temp.check((select display_name from app_users where id = '10000000-0000-0000-0000-000000000003') = 'reader',
                      'administrador no puede modificar cuentas');
@@ -343,7 +343,7 @@ begin;
 set local role authenticated;
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
 select pg_temp.check((select count(*) = 6 from app_users), 'super ve todas las cuentas');
-select pg_temp.check((select count(*) = 5 from permission_templates), 'super ve las plantillas');
+select pg_temp.check((select count(*) = 6 from permission_templates), 'super ve las plantillas');
 select fn_save_app_user('10000000-0000-0000-0000-000000000003', 'Lectora', false, true, false,
                         array['00000000-0000-0000-0000-0000000000a1']::uuid[], '{"PERSONAS":"edit","METRICAS":"read"}');
 select pg_temp.check((select count(*) = 2 from app_user_permissions where user_id = '10000000-0000-0000-0000-000000000003'),
@@ -381,6 +381,36 @@ set local role authenticated;
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000003';
 select pg_temp.check((select count(*) = 0 from persons), 'cuenta desactivada no ve datos');
 select pg_temp.check(fn_my_access() is null, 'cuenta desactivada: fn_my_access es NULL');
+rollback;
+
+-- Gestor de usuarios (solo USUARIOS): gestiona cuentas, no ve datos
+begin;
+insert into auth.users (id, email) values ('10000000-0000-0000-0000-000000000007', 'gestor@demo');
+insert into app_users (id, system_role_id, display_name) select '10000000-0000-0000-0000-000000000007', id, 'gestor' from catalog_system_roles where code = 'USER';
+insert into app_user_permissions (user_id, area, can_edit) values ('10000000-0000-0000-0000-000000000007', 'USUARIOS', true);
+insert into auth.users (id, email) values ('10000000-0000-0000-0000-000000000008', 'nuevo@demo');
+set local role authenticated;
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000007';
+select pg_temp.check((select count(*) = 0 from persons), 'gestor de usuarios no ve personas');
+select pg_temp.check((select count(*) = 0 from monthly_reports), 'gestor de usuarios no ve informes');
+select pg_temp.check((select count(*) = 6 from app_users), 'gestor ve las cuentas menos la del super');
+select pg_temp.check((select count(*) = 6 from permission_templates), 'gestor ve las plantillas');
+select pg_temp.check((fn_my_access()->'areas') = '{"USUARIOS":"edit"}'::jsonb, 'fn_my_access: solo USUARIOS');
+select fn_save_app_user('10000000-0000-0000-0000-000000000008', 'Nuevo', false, true, true, '{}', '{"INFORMES":"edit"}');
+select fn_set_user_area('10000000-0000-0000-0000-000000000005', 'PERSONAS', 'read');
+select pg_temp.check((select count(*) = 1 from app_user_permissions where user_id = '10000000-0000-0000-0000-000000000008'),
+                     'gestor crea una cuenta con permisos');
+select pg_temp.expect_error($$select fn_save_app_user('10000000-0000-0000-0000-000000000008', 'x', true, true, true, '{}', '{}')$$, '%crear otro super%');
+select pg_temp.expect_error($$select fn_save_app_user('10000000-0000-0000-0000-000000000001', 'x', false, true, true, '{}', '{}')$$, '%cambiar a otro super%');
+select pg_temp.expect_error($$select fn_set_user_area('10000000-0000-0000-0000-000000000007', 'PERSONAS', 'edit')$$, '%propios permisos%');
+select pg_temp.expect_error($$insert into app_user_permissions (user_id, area, can_edit)
+  values ('10000000-0000-0000-0000-000000000007', 'PERSONAS', true)$$, '%row-level security%');
+select pg_temp.expect_error($$update app_users set system_role_id = (select id from catalog_system_roles where code = 'SUPERADMIN')
+  where id = '10000000-0000-0000-0000-000000000008'$$, '%row-level security%');
+update app_users set display_name = 'hack' where id = '10000000-0000-0000-0000-000000000001';
+reset role;
+select pg_temp.check((select display_name = 'super' from app_users where id = '10000000-0000-0000-0000-000000000001'),
+                     'gestor no puede tocar la cuenta del super');
 rollback;
 
 -- Encargado del Grupo 2: solo ve y edita a Carla y Diego

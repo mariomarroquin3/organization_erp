@@ -5,7 +5,7 @@ import type { Area } from '@/lib/permissions';
 import { signOut } from '@/app/login/actions';
 
 // Cada enlace aparece solo si la cuenta puede leer su área
-const LINKS: (NavLink & { area?: Area; superadmin?: boolean })[] = [
+const LINKS: (NavLink & { area?: Area })[] = [
   { href: '/', label: 'Panel' },
   { href: '/informes', label: 'Informes del mes', area: 'INFORMES' },
   { href: '/personas', label: 'Personas', area: 'PERSONAS' },
@@ -14,7 +14,7 @@ const LINKS: (NavLink & { area?: Area; superadmin?: boolean })[] = [
   { href: '/informe-anual', label: 'Informe anual', area: 'METRICAS' },
   { href: '/exportar', label: 'Exportar', area: 'METRICAS' },
   { href: '/configuracion', label: 'Configuración', area: 'CONFIGURACION' },
-  { href: '/usuarios', label: 'Usuarios', superadmin: true },
+  { href: '/usuarios', label: 'Usuarios', area: 'USUARIOS' },
 ];
 
 function accessLabel(s: Session) {
@@ -26,7 +26,7 @@ function accessLabel(s: Session) {
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const session = await requireSession();
   const links = LINKS
-    .filter((l) => (l.superadmin ? session.isSuperadmin : !l.area || can(session, l.area)))
+    .filter((l) => !l.area || can(session, l.area))
     .map(({ href, label }) => ({ href, label }));
 
   return (
