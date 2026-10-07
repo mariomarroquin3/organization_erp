@@ -1,20 +1,19 @@
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
 import { ActionForm, SubmitButton } from '@/components/ActionForm';
 import { AccessFields } from '@/components/AccessFields';
 import { AreaToggle } from '@/components/AreaToggle';
-import { Empty, PageHeader } from '@/components/ui';
+import { Empty, PageHeader, ReadOnlyNote } from '@/components/ui';
 import { createClient } from '@/lib/supabase/server';
 import { hasServiceRole } from '@/lib/supabase/admin';
 import { listGroups } from '@/lib/services/catalogs';
 import { listTemplates, listUsers, type Template } from '@/lib/services/users';
-import { requireSession } from '@/lib/services/session';
+import { can, requireAreaPage } from '@/lib/services/session';
 import { AREAS, AREA_INFO, LEVEL_LABEL } from '@/lib/permissions';
 import * as A from './actions';
 
 export default async function UsuariosPage() {
-  const session = await requireSession();
-  if (!session.isSuperadmin) redirect('/');
+  const session = await requireAreaPage('USUARIOS');
+  const canEdit = can(session, 'USUARIOS', 'edit');
   const db = await createClient();
   const [users, templates, groups] = await Promise.all([listUsers(db), listTemplates(db), listGroups(db, { onlyActive: true })]);
   const canCreate = hasServiceRole();
@@ -22,6 +21,7 @@ export default async function UsuariosPage() {
   return (
     <>
       <PageHeader title="Usuarios" />
+      {!canEdit ? <ReadOnlyNote /> : null}
 
       <section className="card">
         <h2>Cuentas</h2>
@@ -53,11 +53,11 @@ export default async function UsuariosPage() {
                       <>
                         <td>{u.allGroups ? 'Todas' : u.groupNames.join(', ')}</td>
                         {AREAS.map((a) => (
-                          <td key={a}><AreaToggle userId={u.id} area={a} level={u.areas[a] ?? null} /></td>
+                          <td key={a}><AreaToggle userId={u.id} area={a} level={u.areas[a] ?? null} readOnly={!canEdit || u.id === session.userId} /></td>
                         ))}
                       </>
                     )}
-                    <td>{u.id === session.userId && u.superadmin ? <span className="muted small">Tú</span> : <Link href={`/usuarios/${u.id}`}>Editar</Link>}</td>
+                    <td>{u.id === session.userId ? <span className="muted small">Tú</span> : canEdit ? <Link href={`/usuarios/${u.id}`}>Editar</Link> : null}</td>
                   </tr>
                 ))}
               </tbody>
@@ -66,6 +66,7 @@ export default async function UsuariosPage() {
         )}
       </section>
 
+      {canEdit ? <>
       <section className="card">
         <h2>Nuevo usuario</h2>
         {!canCreate ? (
@@ -83,7 +84,7 @@ export default async function UsuariosPage() {
           </div>
           <AccessFields
             initial={{ superadmin: false, scope: 'all', groupIds: [], areas: {} }}
-            groups={groups} templates={templates} allowSuperadmin
+            groups={groups} templates={templates} allowSuperadmin={session.isSuperadmin}
           />
           <div><SubmitButton>Crear usuario</SubmitButton></div>
         </ActionForm>
@@ -113,6 +114,7 @@ export default async function UsuariosPage() {
           <TemplateForm groups={groups} />
         </details>
       </section>
+      </> : null}
     </>
   );
 }

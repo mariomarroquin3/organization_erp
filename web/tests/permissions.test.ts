@@ -3,7 +3,7 @@ import { allows, cleanAreaMap } from '@/lib/permissions';
 
 describe('cleanAreaMap', () => {
   it('descarta áreas y niveles desconocidos', () => {
-    expect(cleanAreaMap({ PERSONAS: 'edit', USUARIOS: 'edit', INFORMES: 'all' })).toEqual({ PERSONAS: 'edit' });
+    expect(cleanAreaMap({ PERSONAS: 'edit', BITACORA: 'edit', INFORMES: 'all' })).toEqual({ PERSONAS: 'edit' });
   });
   it('Métricas solo se lee', () => {
     expect(cleanAreaMap({ METRICAS: 'edit' })).toEqual({ METRICAS: 'read' });

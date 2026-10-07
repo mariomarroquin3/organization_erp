@@ -66,9 +66,3 @@ export async function requireArea(area: Area, need: Level = 'edit'): Promise<Ses
   if (!can(s, area, need)) throw new ServiceError('Tu cuenta no tiene permiso para esto.');
   return s;
 }
-
-export async function requireSuperadmin(): Promise<Session> {
-  const s = await requireSession();
-  if (!s.isSuperadmin) throw new ServiceError('Solo un super administrador gestiona cuentas.');
-  return s;
-}
