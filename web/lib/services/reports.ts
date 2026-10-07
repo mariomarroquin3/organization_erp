@@ -10,7 +10,7 @@ export interface SheetRow {
   last_name: string;
   is_active: boolean;
   group_name: string | null;
-  hours_role: string | null;  // PR / PA ese mes
+  hours_role: string | null;  // PR / PAI / PA ese mes
   report: ExistingReport | null;
 }
 

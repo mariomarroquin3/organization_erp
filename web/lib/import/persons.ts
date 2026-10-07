@@ -15,7 +15,7 @@ export const COLUMNS = [
   { key: 'birth_date', header: 'Fecha de nacimiento', help: 'Fecha (dd/mm/aaaa).', width: 14 },
   { key: 'group', header: 'Grupo', help: 'Nombre exacto de un grupo del sistema (ver hoja Listas).', width: 18 },
   { key: 'group_start', header: 'En el grupo desde', help: 'Fecha. Si se deja vacía: inicio del año de servicio actual (1 de septiembre).', width: 14 },
-  { key: 'roles', header: 'Cargos', help: 'Códigos separados por coma, ej. "PR" o "PB, PR". No puede tener PR y PA a la vez.', width: 12 },
+  { key: 'roles', header: 'Cargos', help: 'Códigos separados por coma, ej. "PR" o "PB, PAI". Solo un cargo con horas (PR, PAI). PA es por meses: agrégalo desde la ficha.', width: 12 },
   { key: 'roles_start', header: 'Cargos desde', help: 'Fecha. Si se deja vacía: inicio del año de servicio actual (1 de septiembre).', width: 14 },
   { key: 'phone', header: 'Teléfono', help: 'Opcional.', width: 16 },
   { key: 'email', header: 'Correo', help: 'Opcional.', width: 24 },
@@ -250,6 +250,10 @@ export function validateRows(
     }
     if (roleList.filter((r) => r.requires_hours_report).length > 1) {
       msgs.push(`No puede tener ${roleList.filter((r) => r.requires_hours_report).map((r) => r.code).join(' y ')} a la vez.`);
+    }
+
+    for (const r of roleList.filter((x) => x.requires_end_date)) {
+      msgs.push(`${r.code} es por meses concretos: agrégalo desde la ficha con su fecha de fin${r.code === 'PA' ? ' (si es indefinido, usa PAI)' : ''}.`);
     }
 
     if (roleList.some((r) => r.code === 'PB') && roleList.some((r) => r.code === 'PNB')) {

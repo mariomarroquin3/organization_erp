@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import ExcelJS from 'exceljs';
 import { completenessTable, complianceTable, matrixCell, matrixTable } from '@/lib/export/tables';
+import { isWithoutHoursRole } from '@/lib/services/metrics';
 import { toXlsx } from '@/lib/export/xlsx';
 import { toPdf } from '@/lib/export/pdf';
 import type { GoalCompliance, ReportMatrixRow, ServiceYearSummary } from '@/lib/types';
@@ -57,6 +58,25 @@ describe('celdas de la matriz', () => {
     expect(carla[3]).toBeNull();
     expect(carla[4]).toBe('Sí · 1 c.');
     expect(carla.at(-1)).toBe(1);
+  });
+
+  it('PAI cuenta como cargo con horas y se ordena PR, PAI, PA', () => {
+    const t = matrixTable([
+      m('elena', 2025, 9, { hours_role: 'PA', has_report: true, participated: true, hours: 30 }),
+      m('elena', 2025, 10, { hours_role: 'PAI' }),
+      m('elena', 2025, 11, { hours_role: 'PR', has_report: true, participated: true, hours: 50 }),
+    ], 2026);
+    const elena = t.rows.find((r) => r[0] === 'ELENA')!;
+    expect(elena.slice(3, 7)).toEqual(['PR/PAI/PA', 30, 'Falta', 50]);
+  });
+});
+
+describe('cargos con horas', () => {
+  it('quien es PAI no cuenta entre los que solo informan sí/no', () => {
+    expect(isWithoutHoursRole('PB, PAI')).toBe(false);
+    expect(isWithoutHoursRole('PA')).toBe(false);
+    expect(isWithoutHoursRole('PB, PNB')).toBe(true);
+    expect(isWithoutHoursRole(null)).toBe(true);
   });
 });
 

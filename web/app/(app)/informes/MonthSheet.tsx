@@ -65,8 +65,8 @@ export function MonthSheet({ rows, mes, canEdit, anio }: { rows: SheetRow[]; mes
             {groups.map((g) => <option key={g}>{g}</option>)}
           </select>
           <label className="inline"><input type="checkbox" checked={onlyMissing} onChange={(e) => setOnlyMissing(e.target.checked)} /> Solo sin informe</label>
-          <span className="muted">{counts.done} de {counts.total} con informe{counts.missingHours ? ` · ${counts.missingHours} PR/PA sin horas` : ''}</span>
-          {canEdit ? <button type="button" className="btn-secondary" onClick={markAllYes} title="Solo a quienes no son PR/PA y aún no tienen informe">Marcar visibles “Sí”</button> : null}
+          <span className="muted">{counts.done} de {counts.total} con informe{counts.missingHours ? ` · ${counts.missingHours} PR/PAI/PA sin horas` : ''}</span>
+          {canEdit ? <button type="button" className="btn-secondary" onClick={markAllYes} title="Solo a quienes no son PR/PAI/PA y aún no tienen informe">Marcar visibles “Sí”</button> : null}
         </div>
 
         <table className="table sheet">

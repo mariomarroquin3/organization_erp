@@ -5,9 +5,9 @@ import { yearContext, type SearchParams } from '@/lib/page';
 import { requireAreaPage } from '@/lib/services/session';
 
 const DESCRIPTIONS: Record<string, string> = {
-  cumplimiento: 'Horas, meta, avance y estado de cada PR y PA.',
-  completitud: 'Meses informados y con participación por persona (incluye a quienes no son PR ni PA).',
-  matriz: 'Una fila por persona y una columna por mes: horas para PR/PA, Sí/No para el resto.',
+  cumplimiento: 'Horas, meta, avance y estado de cada PR, PAI y PA.',
+  completitud: 'Meses informados y con participación por persona (incluye a quienes no son PR, PAI ni PA).',
+  matriz: 'Una fila por persona y una columna por mes: horas para PR/PAI/PA, Sí/No para el resto.',
   mensual: 'Informes recibidos, participación y horas por mes y grupo.',
   personas: 'Listado actual con grupo, cargos y última alta o baja.',
   movimientos: 'Altas (nuevo ingreso, traslado, reingreso) y bajas del año, con congregación de origen o destino.',
@@ -28,7 +28,7 @@ export default async function ExportarPage({ searchParams }: { searchParams: Sea
           <tbody>
             <tr className="highlight">
               <td><strong>Informe del año de servicio</strong></td>
-              <td>Resumen de cierre del año {sy} (sep–ago): informes, horas, resultado de cada PR y PA, totales por grupo, detalle mes a mes y altas/bajas. <a href={`/informe-anual?anio=${sy}`}>Ver en pantalla</a></td>
+              <td>Resumen de cierre del año {sy} (sep–ago): informes, horas, resultado de cada PR, PAI y PA, totales por grupo, detalle mes a mes y altas/bajas. <a href={`/informe-anual?anio=${sy}`}>Ver en pantalla</a></td>
               <td className="nowrap">
                 <a className="btn" href={link('anual', 'xlsx')}>Excel</a>{' '}
                 <a className="btn-secondary" href={link('anual', 'pdf')}>PDF</a>

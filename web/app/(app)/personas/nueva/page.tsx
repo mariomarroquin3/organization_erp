@@ -39,7 +39,7 @@ export default async function NuevaPersonaPage() {
           <label>Fecha de alta<input type="date" name="alta_date" defaultValue={today()} max={today()} /></label>
           <label className="span-2">Congregación de origen (si viene por traslado)<input name="alta_congregation" /></label>
         </div>
-        <p className="muted">Los cargos (PR, PA, …) se agregan desde la ficha, con su fecha de inicio.</p>
+        <p className="muted">Los cargos (PR, PAI, PA, …) se agregan desde la ficha, con su fecha de inicio.</p>
         <div><SubmitButton>Crear persona</SubmitButton></div>
       </ActionForm>
     </>

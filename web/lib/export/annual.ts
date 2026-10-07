@@ -40,6 +40,7 @@ export interface AnnualOverview {
   studiesAvg: number | null;  // cursos bíblicos promedio por mes cerrado
   monthsWithData: number;     // meses con resumen (divisor del promedio)
   pr: RoleTotals;
+  pai: RoleTotals;   // PA indefinido: avance como PR, meta de 30 h por mes
   pa: RoleTotals;
   altas: number;
   bajas: number;
@@ -103,6 +104,7 @@ export function annualOverview(
     monthsWithData: periods,
     studiesAvg: periods ? Math.round((10 * sum('studies')) / periods) / 10 : null,
     pr: roleTotals(data.compliance, 'PR'),
+    pai: roleTotals(data.compliance, 'PAI'),
     pa: roleTotals(data.compliance, 'PA'),
     altas,
     bajas: data.movements.length - altas,
@@ -112,9 +114,9 @@ export function annualOverview(
 
 /** Frase de estado del año, igual en pantalla, Excel y PDF. */
 export function yearStatusText(o: AnnualOverview): string {
-  if (o.closed) return `Año cerrado el ${o.closesOn}. Los resultados de PR son finales.`;
+  if (o.closed) return `Año cerrado el ${o.closesOn}. Los resultados de PR y PAI son finales.`;
   return `En curso: ${o.monthsClosed} de 12 meses cerrados. El año cierra el ${o.closesOn}; `
-    + 'las horas de PR deben completarse antes de esa fecha.';
+    + 'las horas de PR y PAI deben completarse antes de esa fecha.';
 }
 
 function roleLine(t: RoleTotals, closed: boolean): string {
@@ -135,6 +137,9 @@ export function annualSummaryTable(o: AnnualOverview): ReportTable {
     ['PR: personas', fmtNum(o.pr.persons)],
     ['PR: horas / meta', `${fmtNum(o.pr.hours)} de ${fmtNum(o.pr.goal)} (${fmtPct(o.pr.pct)})`],
     ['PR: resultado', roleLine(o.pr, o.closed)],
+    ['PAI: personas', fmtNum(o.pai.persons)],
+    ['PAI: horas / meta', `${fmtNum(o.pai.hours)} de ${fmtNum(o.pai.goal)} (${fmtPct(o.pai.pct)})`],
+    ['PAI: resultado', roleLine(o.pai, o.closed)],
     ['PA: personas', fmtNum(o.pa.persons)],
     ['PA: horas / meta', `${fmtNum(o.pa.hours)} de ${fmtNum(o.pa.goal)} (${fmtPct(o.pa.pct)})`],
     ['PA: resultado', roleLine(o.pa, o.closed)],
@@ -148,7 +153,8 @@ export function annualSummaryTable(o: AnnualOverview): ReportTable {
     columns: [{ header: 'Concepto', width: 26 }, { header: 'Valor', width: 90 }],
     rows,
     notes: [
-      'El año de servicio va del 1 de septiembre al 31 de agosto; la meta anual de PR se mide en ese margen.',
+      'El año de servicio va del 1 de septiembre al 31 de agosto; las metas de PR y PAI se miden en ese margen.',
+      'PAI (PA indefinido): 30 h por cada mes con el cargo, 360 h el año completo. PA: 30 h en cada mes indicado.',
       'Los totales consideran solo meses cerrados. Las secciones siguientes tienen el detalle.',
     ],
   };

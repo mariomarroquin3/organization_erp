@@ -35,6 +35,7 @@ export async function saveRoleAction(_p: ActionState, fd: FormData): Promise<Act
       code: required(fd, 'code', 'el código'),
       name: required(fd, 'name', 'el nombre'),
       requires_hours_report: fd.get('requires_hours_report') === 'on',
+      requires_end_date: fd.get('requires_end_date') === 'on',
       is_active: fd.has('id') ? fd.get('is_active') === 'on' : true,
       sort_order: optNum(fd, 'sort_order', 'El orden') ?? 100,
     });

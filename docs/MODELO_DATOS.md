@@ -6,13 +6,15 @@ Iteración sobre el `schema.sql` y el `CONTEXTO_PROYECTO.md` originales. Se cons
 
 **Año de servicio.** Va de septiembre a agosto y se nombra por el año en que cierra: el año de servicio 2026 es sep-2025 a ago-2026. `service_year_of(fecha)` lo calcula.
 
-**Metas (`role_hour_goals`).** Una meta por cargo con vigencia desde un año de servicio; sigue aplicando hasta que se registre otra más reciente. Puede ser anual (PR, se prorratea: meta/12 por cada mes con el cargo) o mensual (PA, meta fija por mes con el cargo). Solo los cargos con `requires_hours_report` pueden tener meta.
+**Metas (`role_hour_goals`).** Una meta por cargo con vigencia desde un año de servicio; sigue aplicando hasta que se registre otra más reciente. Puede ser anual (PR, se prorratea: meta/12 por cada mes con el cargo) o mensual (PAI y PA, meta fija por mes con el cargo). Solo los cargos con `requires_hours_report` pueden tener meta.
+
+**PA y PAI (migración 1400).** PA es un cargo por meses concretos (por ejemplo, solo septiembre): `catalog_roles.requires_end_date` lo marca y un trigger no deja guardar un periodo de PA sin fecha de fin. PAI (PA indefinido) sigue vigente hasta que se cierre, con meta de 30 h por mes (360 h el año completo); como cualquier cargo con horas abierto, se proyecta hasta el cierre del año de servicio, así que su avance (meta del año, meta a la fecha, faltan, estado) se mide igual que el de PR. PR, PAI y PA no pueden solaparse entre sí.
 
 **Informe mensual (`monthly_reports`).** Reemplaza `service_hours`. Un registro por persona y mes para todos:
 
 | Quién | `participated` | `hours` | `bible_studies` |
 |---|---|---|---|
-| PR / PA ese mes | obligatorio | obligatorio (0 si no hubo) | 0 por omisión |
+| PR / PAI / PA ese mes | obligatorio | obligatorio (0 si no hubo) | 0 por omisión |
 | Cualquier otra persona (PNB, PB, otros cargos) | obligatorio (sí/no) | vacío | 0 por omisión |
 
 `bible_studies` son los cursos bíblicos del mes (0 a 99, migración 1100); si es mayor que 0, la persona participó.
@@ -62,7 +64,7 @@ Todas las vistas usan `security_invoker`, así que respetan el RLS (en el origin
 | `view_goal_compliance` | **Cumplimiento** por persona, año de servicio y cargo: meta, meta a la fecha, horas, % de meta, horas que faltan, horas por mes necesarias, informes faltantes y estado (`CUMPLIDA`, `AL DIA`, `ATRASADO`, `NO CUMPLIDA`, `SIN META`). |
 | `view_service_year_hours`, `view_annual_hours` | Totales por año de servicio y calendario. |
 | `fn_report_matrix(año)` | Matriz persona × mes: informó, participó, horas, cargo y grupo de ese mes. Base de la exportación a Excel. |
-| `fn_service_year_summary(año)` | **Completitud** por persona: meses esperados, informados, con participación y porcentajes. Es la métrica de quien no es PR ni PA. |
+| `fn_service_year_summary(año)` | **Completitud** por persona: meses esperados, informados, con participación y porcentajes. Es la métrica de quien no es PR, PAI ni PA. |
 | `fn_monthly_summary(año)` | Resumen de la organización por mes y grupo. |
 | `fn_reassign_groups(fecha, cambios, grupos_a_desactivar)` | Reagrupación (migración 1000): cambia de grupo a varias personas desde una fecha en una transacción y desactiva los grupos que desaparecen. Los periodos anteriores se cierran el día antes, así que los meses pasados conservan su grupo. Un grupo con personas no se puede desactivar. |
 | `fn_import_persons(filas)` | Alta masiva desde Excel (migración 0900): persona, alta, grupo, cargos y contactos de varias filas en una sola transacción; si una fila falla no se guarda ninguna y el error indica la fila. |
@@ -85,8 +87,8 @@ Además: cuentas desactivables, `anon` sin acceso a tablas ni vistas, funciones 
 
 ## Decisiones tomadas por defecto (confirmar con Javier)
 
-1. Metas de ejemplo: PR 600 h al año, PA 30 h por mes, desde el año de servicio 2026. Se cambian editando `role_hour_goals`.
+1. Metas: PR 600 h al año (por confirmar), PAI 30 h por mes (360 h al año), PA 30 h por mes, desde el año de servicio 2026. Se cambian editando `role_hour_goals`.
 2. Si alguien tiene el cargo solo parte de un mes, ese mes cuenta completo para la meta. Si cambió de PA a PR dentro del mes, cuenta el cargo que empezó más tarde.
 3. Un cargo vigente se proyecta hasta agosto para calcular la meta del año.
 4. La completitud y las metas consideran solo los meses en que la persona era miembro (según sus altas y bajas), más los meses en que sí informó.
-5. Las horas de meses sin cargo PR/PA se guardan pero no suman a ninguna meta.
+5. Las horas de meses sin cargo PR/PAI/PA se guardan pero no suman a ninguna meta.

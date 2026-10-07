@@ -4,6 +4,7 @@
 import type { GoalCompliance, MonthlySummary, PersonMovement, PersonOverview, ReportMatrixRow, ServiceYearSummary } from '@/lib/types';
 import { MONTH_SHORT, serviceYearLabel, serviceYearMonths } from '@/lib/service-year';
 import { STATUS_LABEL, fmtDate } from '@/lib/format';
+import { GOAL_RULES_NOTE, compareHoursRoles } from '@/lib/roles';
 
 export type CellFormat = 'text' | 'num' | 'pct';
 export type Cell = string | number | null;
@@ -21,7 +22,7 @@ export interface ReportTable {
 }
 
 export const REPORTS = {
-  cumplimiento: 'Cumplimiento de metas PR/PA',
+  cumplimiento: 'Cumplimiento de metas PR/PAI/PA',
   completitud: 'Completitud de informes por persona',
   matriz: 'Informes mes a mes',
   mensual: 'Resumen mensual por grupo',
@@ -55,7 +56,7 @@ export function complianceTable(rows: GoalCompliance[], sy: number): ReportTable
       n(r.pct_goal), n(r.pct_to_date), n(r.hours_needed_per_month), STATUS_LABEL[r.status] ?? r.status,
     ]),
     notes: [
-      'La meta anual de PR se prorratea por los meses con el cargo; la de PA es por mes con el cargo.',
+      GOAL_RULES_NOTE,
       '"A la fecha" considera solo meses cerrados (anteriores al mes en curso).',
     ],
   };
@@ -80,12 +81,12 @@ export function completenessTable(rows: ServiceYearSummary[], sy: number): Repor
       r.months_expected, r.months_reported, r.months_participated,
       n(r.pct_reported), n(r.pct_participated), n(r.total_hours),
     ]),
-    notes: ['Para quien no es PR ni PA, la participación es sí/no por mes.'],
+    notes: ['Para quien no es PR, PAI ni PA, la participación es sí/no por mes.'],
   };
 }
 
 /**
- * Celda de la matriz: horas para PR/PA, Sí/No para el resto, vacío si no
+ * Celda de la matriz: horas para PR/PAI/PA, Sí/No para el resto, vacío si no
  * informó. Si informó cursos bíblicos se agregan como "· 2 c.".
  */
 export function matrixCell(
@@ -115,23 +116,23 @@ export function matrixTable(rows: ReportMatrixRow[], sy: number): ReportTable {
   return {
     key: 'Mes a mes',
     title: REPORTS.matriz,
-    subtitle: `Año de servicio ${serviceYearLabel(sy)} · horas (PR/PA) o participación sí/no`,
+    subtitle: `Año de servicio ${serviceYearLabel(sy)} · horas (PR/PAI/PA) o participación sí/no`,
     landscape: true,
     columns: [
       { header: 'Apellidos', width: 16 }, { header: 'Nombre', width: 14 }, { header: 'Grupo', width: 12 },
-      { header: 'PR/PA', width: 7 },
+      { header: 'Cargo', width: 8 },
       ...months.map((m) => ({ header: `${MONTH_SHORT[m.month - 1]} ${String(m.year).slice(2)}`, width: 7 })),
       { header: 'Total h', format: 'num' as const },
       { header: 'Cursos (máx./mes)', format: 'num' as const },
     ],
     rows: [...people.values()].map((p) => [
-      p.last, p.first, p.group, [...p.roles].sort().join('/') || null,
+      p.last, p.first, p.group, [...p.roles].sort(compareHoursRoles).join('/') || null,
       ...months.map((m) => p.cells.get(keyOf(m.year, m.month)) ?? null),
       p.hours,
       p.studies,
     ]),
     notes: [
-      '"Falta": era PR/PA ese mes y no hay informe. "—": no informó. "· 2 c.": cursos bíblicos informados ese mes.',
+      '"Falta": era PR, PAI o PA ese mes y no hay informe. "—": no informó. "· 2 c.": cursos bíblicos informados ese mes.',
       'Celda vacía: el mes aún no cierra o la persona no era miembro ese mes (antes de su alta o después de su baja).',
     ],
   };
@@ -146,7 +147,7 @@ export function monthlyTable(rows: MonthlySummary[], sy: number): ReportTable {
       { header: 'Mes', width: 10 }, { header: 'Grupo', width: 16 },
       { header: 'Personas', format: 'num' }, { header: 'Informes', format: 'num' },
       { header: 'Participaron', format: 'num' }, { header: '% informado', format: 'pct' },
-      { header: 'PR/PA', format: 'num' }, { header: 'Horas', format: 'num' },
+      { header: 'PR/PAI/PA', format: 'num' }, { header: 'Horas', format: 'num' },
       { header: 'Cursos bíblicos', format: 'num' },
     ],
     rows: rows.map((r) => {

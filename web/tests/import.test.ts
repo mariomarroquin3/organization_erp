@@ -10,10 +10,11 @@ const cat: ImportCatalogs = {
     { id: 'g2', name: 'Viejo', description: null, is_active: false },
   ],
   roles: [
-    { id: 'pr', code: 'PR', name: 'PR', requires_hours_report: true, is_active: true, sort_order: 10 },
-    { id: 'pa', code: 'PA', name: 'PA', requires_hours_report: true, is_active: true, sort_order: 20 },
-    { id: 'pb', code: 'PB', name: 'PB', requires_hours_report: false, is_active: true, sort_order: 30 },
-    { id: 'pnb', code: 'PNB', name: 'Publicador no bautizado', requires_hours_report: false, is_active: true, sort_order: 25 },
+    { id: 'pr', code: 'PR', name: 'PR', requires_hours_report: true, requires_end_date: false, is_active: true, sort_order: 10 },
+    { id: 'pai', code: 'PAI', name: 'PA indefinido', requires_hours_report: true, requires_end_date: false, is_active: true, sort_order: 15 },
+    { id: 'pa', code: 'PA', name: 'PA', requires_hours_report: true, requires_end_date: true, is_active: true, sort_order: 20 },
+    { id: 'pb', code: 'PB', name: 'PB', requires_hours_report: false, requires_end_date: false, is_active: true, sort_order: 30 },
+    { id: 'pnb', code: 'PNB', name: 'Publicador no bautizado', requires_hours_report: false, requires_end_date: false, is_active: true, sort_order: 25 },
   ],
   contactTypes: [
     { id: 'tel', code: 'PHONE', name: 'Teléfono' }, { id: 'mail', code: 'EMAIL', name: 'Correo' },
@@ -61,7 +62,7 @@ describe('validación de filas', () => {
 
   it('una persona que llegó después del 1 de septiembre empieza grupo y cargos en su alta', () => {
     const r = validateRows([row(2, {
-      first_name: 'Beto', last_name: 'Ruiz', group: 'Grupo Norte', roles: 'PA',
+      first_name: 'Beto', last_name: 'Ruiz', group: 'Grupo Norte', roles: 'PAI',
       alta_date: '20/09/2026', alta_type: 'Traslado desde otra congregación', alta_congregation: 'Centro',
     })], cat, [], TODAY);
     expect(r.payload[0]).toMatchObject({
@@ -73,26 +74,29 @@ describe('validación de filas', () => {
   it('marca errores fila por fila', () => {
     const r = validateRows([
       row(2, { first_name: 'Sin apellido' }),
-      row(3, { first_name: 'C', last_name: 'D', group: 'Viejo', roles: 'PR, PA, XX' }),
+      row(3, { first_name: 'C', last_name: 'D', group: 'Viejo', roles: 'PR, PAI, XX' }),
       row(4, { first_name: 'E', last_name: 'F', birth_date: '2030-01-01', email: 'no-es-correo' }),
       row(5, { first_name: 'G', last_name: 'H', alta_type: 'Traslado desde otra congregación', alta_date: '01/09/2026' }),
       row(6, { first_name: 'I', last_name: 'J', alta_type: 'Otra baja', alta_date: '01/09/2026' }),
       row(7, { first_name: 'K', last_name: 'L', roles: 'PB PNB' }),
       row(8, { first_name: 'M', last_name: 'N', roles: 'publicador no bautizado' }),
+      row(9, { first_name: 'O', last_name: 'P', roles: 'PA' }),
     ], cat, [], TODAY);
-    expect(r.counts.error).toBe(6);
+    expect(r.counts.error).toBe(7);
     expect(r.rows.find((x) => x.row === 8)).toMatchObject({ status: 'ok', roles: 'PNB' });
     expect(r.payload.map((p) => p.row)).toEqual([8]);
     const msg = (n: number) => r.rows.find((x) => x.row === n)!.messages.join(' ');
     expect(msg(2)).toContain('apellidos');
     expect(msg(3)).toContain('"Viejo" no existe');
     expect(msg(3)).toContain('"XX" no existe');
-    expect(msg(3)).toContain('PR y PA a la vez');
+    expect(msg(3)).toContain('PR y PAI a la vez');
     expect(msg(4)).toContain('no puede ser futura');
     expect(msg(4)).toContain('correo');
     expect(msg(5)).toContain('congregación de origen');
     expect(msg(6)).toContain('motivo de alta "Otra baja" no existe');
     expect(msg(7)).toContain('PB y PNB');
+    expect(msg(9)).toContain('PA es por meses concretos');
+    expect(msg(9)).toContain('usa PAI');
   });
 
   it('omite a quien ya existe y marca repetidos dentro del archivo', () => {
