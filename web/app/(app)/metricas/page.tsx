@@ -6,9 +6,10 @@ import { STATUS_LABEL, fmtNum, fmtPct, fullName } from '@/lib/format';
 import { MONTH_SHORT } from '@/lib/service-year';
 import { param, yearContext, type SearchParams } from '@/lib/page';
 import { requireAreaPage } from '@/lib/services/session';
+import { GOAL_RULES_NOTE, HOURS_ROLES } from '@/lib/roles';
 
 const TABS = [
-  { key: 'cumplimiento', label: 'Metas PR / PA' },
+  { key: 'cumplimiento', label: 'Metas PR / PAI / PA' },
   { key: 'completitud', label: 'Completitud por persona' },
   { key: 'mensual', label: 'Resumen mensual' },
 ] as const;
@@ -47,7 +48,7 @@ async function Compliance({ db, sy, role, status, href }: {
     <div className="card">
       <div className="toolbar">
         <span>Cargo:</span>
-        {['', 'PR', 'PA'].map((r) => (
+        {['', ...HOURS_ROLES].map((r) => (
           <Link key={r || 'all'} className={`chip${(role ?? '') === r ? ' on' : ''}`} href={href({ ...(r && { cargo: r }), ...(status && { estado: status }) })}>{r || 'Todos'}</Link>
         ))}
         <span>Estado:</span>
@@ -82,7 +83,7 @@ async function Compliance({ db, sy, role, status, href }: {
           </tbody>
         </table>
       )}
-      <p className="muted small">La meta de PR se prorratea por los meses con el cargo; la de PA es por cada mes con el cargo. “A la fecha” cuenta solo meses cerrados.</p>
+      <p className="muted small">{GOAL_RULES_NOTE} “A la fecha” cuenta solo meses cerrados.</p>
     </div>
   );
 }
@@ -96,7 +97,7 @@ async function Completeness({ db, sy, onlyOthers, href }: {
     <div className="card">
       <div className="toolbar">
         <Link className={`chip${!onlyOthers ? ' on' : ''}`} href={href({})}>Todas las personas</Link>
-        <Link className={`chip${onlyOthers ? ' on' : ''}`} href={href({ solo: 'otros' })}>Solo quienes no son PR ni PA</Link>
+        <Link className={`chip${onlyOthers ? ' on' : ''}`} href={href({ solo: 'otros' })}>Solo quienes no son PR, PAI ni PA</Link>
       </div>
       {rows.length === 0 ? <Empty>Aún no hay meses cerrados en este año de servicio.</Empty> : (
         <table className="table">
@@ -133,7 +134,7 @@ async function Monthly({ db, sy }: { db: Db; sy: number }) {
       {rows.length === 0 ? <Empty>Aún no hay meses cerrados en este año de servicio.</Empty> : (
         <table className="table">
           <thead>
-            <tr><th>Mes</th><th>Grupo</th><th className="num">Personas</th><th className="num">Informes</th><th>% informado</th><th className="num">Participaron</th><th className="num">PR/PA</th><th className="num">Horas</th><th className="num">Cursos</th></tr>
+            <tr><th>Mes</th><th>Grupo</th><th className="num">Personas</th><th className="num">Informes</th><th>% informado</th><th className="num">Participaron</th><th className="num">PR/PAI/PA</th><th className="num">Horas</th><th className="num">Cursos</th></tr>
           </thead>
           <tbody>
             {rows.map((r) => {

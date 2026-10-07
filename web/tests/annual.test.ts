@@ -29,7 +29,7 @@ describe('meses cerrados del año de servicio', () => {
 
 describe('resumen del año', () => {
   const data = {
-    compliance: [gc('a', 'PR', 'CUMPLIDA', 610, 600), gc('b', 'PR', 'NO CUMPLIDA', 500, 600), gc('c', 'PA', 'CUMPLIDA', 90, 90)],
+    compliance: [gc('a', 'PR', 'CUMPLIDA', 610, 600), gc('b', 'PR', 'NO CUMPLIDA', 500, 600), gc('c', 'PA', 'CUMPLIDA', 90, 90), gc('d', 'PAI', 'NO CUMPLIDA', 300, 360)],
     monthly: [ms('2025-09-01', 'Norte', 3, 3, 100, 2), ms('2025-09-01', null, 1, 0, 0), ms('2025-10-01', 'Norte', 3, 2, 80, 3)],
     movements: [mv('ALTA'), mv('ALTA'), mv('BAJA')],
   };
@@ -39,10 +39,14 @@ describe('resumen del año', () => {
     expect(o.closed).toBe(true);
     expect(o).toMatchObject({ expected: 7, received: 5, totalHours: 180, altas: 2, bajas: 1, closesOn: '31/08/2026' });
     expect(o.pr).toMatchObject({ persons: 2, met: 1, notMet: 1, hours: 1110, goal: 1200, pct: 92.5 });
+    expect(o.pai).toMatchObject({ persons: 1, met: 0, notMet: 1, hours: 300, goal: 360 });
+    expect(o.pa).toMatchObject({ persons: 1, met: 1, hours: 90, goal: 90 });
     expect(o.groups.map((g) => g.group)).toEqual(['Norte', 'Sin grupo']);
     expect(yearStatusText(o)).toContain('Año cerrado el 31/08/2026');
     const t = annualSummaryTable(o);
     expect(t.rows.find((r) => r[0] === 'PR: resultado')![1]).toBe('1 cumplieron, 1 no cumplieron');
+    expect(t.rows.find((r) => r[0] === 'PAI: resultado')![1]).toBe('0 cumplieron, 1 no cumplieron');
+    expect(t.rows.map((r) => r[0]).filter((c) => String(c).endsWith(': personas'))).toEqual(['PR: personas', 'PAI: personas', 'PA: personas']);
     // Cursos: 2 en sep + 3 en oct = 5 en 2 meses -> 2.5 por mes
     expect(o.studiesAvg).toBe(2.5);
     expect(t.rows.find((r) => r[0] === 'Cursos bíblicos (promedio por mes)')![1]).toMatch(/^2[.,]5$/);
@@ -52,7 +56,7 @@ describe('resumen del año', () => {
   it('año en curso: recuerda que las horas de PR cierran el 31 de agosto', () => {
     const o = annualOverview(2027, { compliance: [], monthly: [], movements: [] }, new Date(2026, 9, 4));
     expect(o.closed).toBe(false);
-    expect(yearStatusText(o)).toBe('En curso: 1 de 12 meses cerrados. El año cierra el 31/08/2027; las horas de PR deben completarse antes de esa fecha.');
+    expect(yearStatusText(o)).toBe('En curso: 1 de 12 meses cerrados. El año cierra el 31/08/2027; las horas de PR y PAI deben completarse antes de esa fecha.');
   });
 
   it('se exporta a Excel y PDF', async () => {

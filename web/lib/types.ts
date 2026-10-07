@@ -10,7 +10,7 @@ export interface CatalogGroup { id: string; name: string; description: string | 
 
 export interface CatalogRole {
   id: string; code: string; name: string;
-  requires_hours_report: boolean; is_active: boolean; sort_order: number;
+  requires_hours_report: boolean; requires_end_date: boolean; is_active: boolean; sort_order: number;
 }
 
 export interface CatalogType { id: string; code: string; name: string }

@@ -54,6 +54,8 @@ export default async function PersonaPage({ params, searchParams }: {
   const reportOf = new Map(reports.map((r) => [periodKey(r), r]));
   const roleOf = new Map(roleMonths.map((r) => [periodKey(r), r.role_code]));
   const closed = periodKey(lastClosedMonth());
+  // Cargos por meses (PA): un periodo abierto es un dato viejo por corregir
+  const byMonths = new Set(roles.filter((r) => r.requires_end_date).map((r) => r.code));
   const defaultMonth = months.map(periodKey).filter((k) => k <= closed).pop() ?? periodKey(months[0]);
 
   return (
@@ -71,7 +73,7 @@ export default async function PersonaPage({ params, searchParams }: {
       <section className="grid-2">
         <div className="card">
           <h2>Metas del año {sy}</h2>
-          {compliance.length === 0 ? <Empty>No tuvo cargo PR ni PA en este año de servicio.</Empty> : compliance.map((c) => (
+          {compliance.length === 0 ? <Empty>No tuvo cargo PR, PAI ni PA en este año de servicio.</Empty> : compliance.map((c) => (
             <div key={c.role_code} className="goal">
               <div className="goal-head"><strong>{c.role_code}</strong> <StatusBadge status={c.status} /></div>
               <Progress value={c.pct_goal} />
@@ -179,7 +181,8 @@ export default async function PersonaPage({ params, searchParams }: {
             <tbody>
               {detail.roles.map((r) => (
                 <tr key={r.id}>
-                  <td><strong>{r.role_code}</strong> {r.role_name !== r.role_code ? r.role_name : ''} {r.is_current ? <span className="badge badge-info">vigente</span> : null}</td>
+                  <td><strong>{r.role_code}</strong> {r.role_name !== r.role_code ? r.role_name : ''} {r.is_current ? <span className="badge badge-info">vigente</span> : null}
+                    {!r.end_date && byMonths.has(r.role_code) ? <span className="badge badge-warn" title="Es un cargo por meses: ciérralo en su último mes o, si es indefinido, ciérralo y agrega PAI">sin fecha de fin</span> : null}</td>
                   <td>{fmtDate(r.start_date)}</td>
                   <td>{r.end_date ? fmtDate(r.end_date) : canEditPersons ? (
                     <ActionForm action={A.closeRoleAction} className="inline-form">
@@ -210,6 +213,12 @@ export default async function PersonaPage({ params, searchParams }: {
             <label className="inline">Hasta <input type="date" name="end_date" /></label>
             <SubmitButton className="btn-secondary">Agregar cargo</SubmitButton>
           </ActionForm>
+        ) : null}
+        {canEditPersons ? (
+          <p className="muted small">
+            PA es por meses concretos: indica “Hasta” (por ejemplo, del 1 al 30 de septiembre para solo septiembre).
+            PAI (PA indefinido) y PR quedan vigentes hasta que se cierren. Un mes en que tuvo el cargo, aunque sea parte del mes, cuenta completo.
+          </p>
         ) : null}
       </section>
 

@@ -2,6 +2,7 @@ import type { Db } from '@/lib/supabase/server';
 import type {
   ComplianceStatus, GoalCompliance, MonthlySummary, PersonOverview, ReportMatrixRow, ServiceYearSummary,
 } from '@/lib/types';
+import { HOURS_ROLES, compareHoursRoles } from '@/lib/roles';
 import { check, fetchAll } from './errors';
 
 // Las métricas se calculan en la base (vistas y funciones de la
@@ -13,7 +14,8 @@ export async function goalCompliance(db: Db, serviceYear: number, f: { role?: st
   if (f.role) q = q.eq('role_code', f.role);
   if (f.status) q = q.eq('status', f.status);
   if (f.personId) q = q.eq('person_id', f.personId);
-  return check(await q) as GoalCompliance[];
+  // La base ordena por código (PA, PAI, PR); se presentan PR, PAI, PA
+  return (check(await q) as GoalCompliance[]).sort((a, b) => compareHoursRoles(a.role_code, b.role_code));
 }
 
 export async function serviceYearSummary(db: Db, serviceYear: number) {
@@ -34,10 +36,10 @@ export async function personsOverview(db: Db) {
     .order('last_name').order('first_name').order('person_id').range(from, to));
 }
 
-/** Personas sin cargo PR ni PA: su métrica es la completitud sí/no. */
+/** Personas sin cargo PR, PAI ni PA: su métrica es la completitud sí/no. */
 export function isWithoutHoursRole(roles: string | null): boolean {
   const list = (roles ?? '').split(', ').filter(Boolean);
-  return !list.includes('PR') && !list.includes('PA');
+  return !HOURS_ROLES.some((r) => list.includes(r));
 }
 
 export interface DashboardData {
@@ -100,7 +102,7 @@ export function summarizeDashboard(
   return {
     activePersons,
     byStatus,
-    byRole: [...roles.values()].sort((a, b) => a.role.localeCompare(b.role)),
+    byRole: [...roles.values()].sort((a, b) => compareHoursRoles(a.role, b.role)),
     lastMonth,
     avgReported: avg(summary.map((s) => s.pct_reported)),
     avgParticipatedOthers: avg(others.map((s) => s.pct_participated)),

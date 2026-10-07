@@ -34,7 +34,7 @@ export default async function InformesPage({ searchParams }: { searchParams: Sea
         {canGoNext ? <Link className="btn-secondary" href={`/informes?mes=${periodKey(next)}`}>Mes siguiente →</Link> : null}
       </PageHeader>
       <p className="muted">
-        Año de servicio {serviceYearOf(ym.year, ym.month)}. Quien era PR o PA ese mes debe informar horas (0 si no hubo);
+        Año de servicio {serviceYearOf(ym.year, ym.month)}. Quien era PR, PAI o PA ese mes debe informar horas (0 si no hubo);
         el resto solo indica si participó.
       </p>
       {!canEdit ? <ReadOnlyNote /> : null}

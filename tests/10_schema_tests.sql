@@ -29,11 +29,25 @@ end $$;
 -- ---------------------------------------------------------------------
 \echo '== Integridad =='
 begin;
--- Ana es PR vigente: no puede ser PA al mismo tiempo
+-- Ana es PR vigente: no puede ser PA ni PAI al mismo tiempo
+select pg_temp.expect_error($$
+  insert into person_roles (person_id, role_id, start_date, end_date)
+  select '00000000-0000-0000-0000-000000000001', id, '2026-03-01', '2026-03-31' from catalog_roles where code = 'PA'
+$$, '%cargo PR en un periodo que se solapa%');
 select pg_temp.expect_error($$
   insert into person_roles (person_id, role_id, start_date)
-  select '00000000-0000-0000-0000-000000000001', id, '2026-03-01' from catalog_roles where code = 'PA'
+  select '00000000-0000-0000-0000-000000000001', id, '2026-03-01' from catalog_roles where code = 'PAI'
 $$, '%cargo PR en un periodo que se solapa%');
+
+-- PA es por meses concretos: sin fecha de fin no se acepta (eso es PAI)
+select pg_temp.expect_error($$
+  insert into person_roles (person_id, role_id, start_date)
+  select '00000000-0000-0000-0000-000000000004', id, '2026-09-01' from catalog_roles where code = 'PA'
+$$, '%PA es por meses concretos%usa PAI%');
+select pg_temp.expect_error($$
+  update person_roles set end_date = null
+  where role_id = (select id from catalog_roles where code = 'PA')
+$$, '%meses concretos%');
 
 -- Beto fue PR feb-ago 2026: un PA cerrado dentro de ese rango también choca
 select pg_temp.expect_error($$
@@ -109,6 +123,47 @@ select pg_temp.check(
   (select goal_hours = 350 and hours_done = 280 and hours_remaining = 70 and status = 'NO CUMPLIDA'
      from view_goal_compliance where first_name = 'Beto' and service_year = 2026 and role_code = 'PR'),
   'Beto PR 2026: meta prorrateada 7x50=350, 280 h, NO CUMPLIDA');
+
+-- PAI: indefinido, 30 h cada mes, 360 h el año completo, avance como PR
+begin;
+insert into persons (id, first_name, last_name) values
+  ('00000000-0000-0000-0000-0000000000e1', 'Elena', 'Ríos'),
+  ('00000000-0000-0000-0000-0000000000e2', 'Fabio', 'Sosa');
+insert into person_roles (person_id, role_id, start_date)
+select v.p::uuid, cr.id, v.d::date
+from (values ('00000000-0000-0000-0000-0000000000e1', '2025-09-15'),
+             ('00000000-0000-0000-0000-0000000000e2', '2026-01-10')) v(p, d)
+join catalog_roles cr on cr.code = 'PAI';
+insert into monthly_reports (person_id, year, month, participated, hours)
+select '00000000-0000-0000-0000-0000000000e1'::uuid, extract(year from m)::int, extract(month from m)::int, true, 30
+from generate_series('2025-09-01'::timestamp, '2026-08-01', interval '1 month') m
+union all
+select '00000000-0000-0000-0000-0000000000e2'::uuid, extract(year from m)::int, extract(month from m)::int, true, 20
+from generate_series('2026-01-01'::timestamp, '2026-08-01', interval '1 month') m;
+select pg_temp.check(
+  (select months_in_role = 12 and goal_hours = 360 and hours_done = 360 and status = 'CUMPLIDA'
+     from view_goal_compliance where first_name = 'Elena' and service_year = 2026 and role_code = 'PAI'),
+  'Elena PAI 2026 (desde mediados de sep): 12 meses, 360/360 CUMPLIDA');
+select pg_temp.check(
+  (select months_in_role = 8 and goal_hours = 240 and hours_done = 160 and hours_remaining = 80
+          and status = 'NO CUMPLIDA'
+     from view_goal_compliance where first_name = 'Fabio' and service_year = 2026 and role_code = 'PAI'),
+  'Fabio PAI desde enero: meta 8x30=240, 160 h, NO CUMPLIDA');
+select pg_temp.check(
+  (select months_in_role = 12 and goal_hours = 360 and months_missing = months_closed
+     from view_goal_compliance where first_name = 'Elena' and service_year = 2027 and role_code = 'PAI'),
+  'Elena PAI 2027: sigue vigente, meta proyectada 360');
+select pg_temp.check(
+  (select count(*) = 12 from fn_report_matrix(2026) where first_name = 'Elena' and hours_role = 'PAI'),
+  'la matriz marca PAI en cada mes de Elena');
+-- Al terminar el PAI deja de proyectarse
+update person_roles set end_date = '2025-12-31'
+where person_id = '00000000-0000-0000-0000-0000000000e1';
+select pg_temp.check(
+  (select months_in_role = 4 and goal_hours = 120
+     from view_goal_compliance where first_name = 'Elena' and service_year = 2026 and role_code = 'PAI'),
+  'PAI cerrado en diciembre: 4 meses, meta 120');
+rollback;
 
 select pg_temp.check(
   (select months_in_role = 12 and goal_hours = 600 and months_closed >= 1
@@ -501,7 +556,7 @@ select pg_temp.expect_error($$
   select fn_import_persons(jsonb_build_array(
     jsonb_build_object('row', 2, 'first_name', 'Bien', 'last_name', 'Uno'),
     jsonb_build_object('row', 7, 'first_name', 'Mal', 'last_name', 'Dos',
-      'role_ids', (select jsonb_agg(id) from catalog_roles where code in ('PR', 'PA')), 'roles_start', '2026-09-01')))
+      'role_ids', (select jsonb_agg(id) from catalog_roles where code in ('PR', 'PAI')), 'roles_start', '2026-09-01')))
 $$, 'Fila 7:%');
 select pg_temp.check((select count(*) = 0 from persons where first_name in ('Bien', 'Mal')), 'importación fallida no guarda ninguna fila');
 rollback;

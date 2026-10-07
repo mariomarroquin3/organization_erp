@@ -1,6 +1,6 @@
 # ERP de gestión de personal (Javier)
 
-Aplicación web (Next.js) sobre una base de datos en Supabase (PostgreSQL) para gestionar personas, grupos, cargos (PR, PA y otros), informes mensuales, metas anuales de horas por año de servicio (sep-ago), métricas de cumplimiento y completitud, e informes en Excel y PDF.
+Aplicación web (Next.js) sobre una base de datos en Supabase (PostgreSQL) para gestionar personas, grupos, cargos (PR, PAI, PA y otros), informes mensuales, metas anuales de horas por año de servicio (sep-ago), métricas de cumplimiento y completitud, e informes en Excel y PDF.
 
 El diseño y sus decisiones están en [`docs/MODELO_DATOS.md`](docs/MODELO_DATOS.md).
 
@@ -51,14 +51,14 @@ Pantallas:
 
 | Pantalla | Qué hace |
 |---|---|
-| Panel | Personas activas, informes del último mes cerrado, completitud promedio, avance de metas PR/PA y quién va atrasado. |
-| Informes del mes | Hoja de captura mensual: Sí / No / Sin informe para todos y horas para quien era PR o PA ese mes (obligatorias); cursos bíblicos para todos (vacío = 0). Guarda solo lo que cambió. |
+| Panel | Personas activas, informes del último mes cerrado, completitud promedio, avance de metas PR/PAI/PA y quién va atrasado. |
+| Informes del mes | Hoja de captura mensual: Sí / No / Sin informe para todos y horas para quien era PR, PAI o PA ese mes (obligatorias); cursos bíblicos para todos (vacío = 0). Guarda solo lo que cambió. |
 | Personas | Listado con filtros; ficha con metas del año, informes mes a mes, altas/bajas/traslados, cargos, grupos, contactos y fechas. |
 | Reagrupar | En Personas: cambia de grupo a varias personas desde una fecha y desactiva los grupos que desaparecen; el historial de meses pasados no cambia. |
 | Importar desde Excel | En Personas: plantilla descargable (con listas de grupos, cargos y motivos de alta), vista previa con los errores de cada fila y guardado en una sola transacción (`fn_import_persons`). Omite a quien ya existe con el mismo nombre. |
 | Altas y bajas | Altas, bajas y traslados del año de servicio con totales; exportable a Excel o PDF. |
-| Métricas | Cumplimiento de metas PR/PA, completitud por persona (con filtro "solo quienes no son PR ni PA") y resumen mensual por grupo. |
-| Informe anual | Cierre del año de servicio (1 sep – 31 ago): estado del año, informes recibidos, horas, resultado de cada PR y PA, totales por grupo; descarga en Excel o PDF con el detalle mes a mes y las altas/bajas. |
+| Métricas | Cumplimiento de metas PR/PAI/PA, completitud por persona (con filtro "solo quienes no son PR, PAI ni PA") y resumen mensual por grupo. |
+| Informe anual | Cierre del año de servicio (1 sep – 31 ago): estado del año, informes recibidos, horas, resultado de cada PR, PAI y PA, totales por grupo; descarga en Excel o PDF con el detalle mes a mes y las altas/bajas. |
 | Exportar | Cada informe en Excel o PDF, o todos juntos en un solo archivo. |
 | Configuración | Metas de horas por cargo y año, grupos, cargos y cuentas de acceso. |
 

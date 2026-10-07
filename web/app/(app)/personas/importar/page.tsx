@@ -15,7 +15,7 @@ export default async function ImportarPersonasPage() {
       </PageHeader>
       <div className="card">
         <ol className="steps">
-          <li>Descarga la plantilla y llena una fila por persona: nombre, apellidos y, si aplica, grupo, cargos (PR, PA, PB…), contactos y fecha de nacimiento.</li>
+          <li>Descarga la plantilla y llena una fila por persona: nombre, apellidos y, si aplica, grupo, cargos (PR, PAI, PB…), contactos y fecha de nacimiento.</li>
           <li>Sube el archivo y pulsa <strong>Revisar archivo</strong>. Verás cada fila con su estado antes de guardar nada.</li>
           <li>Si no hay errores, pulsa <strong>Importar</strong>. Se guardan todas juntas: si algo falla, no se guarda ninguna.</li>
         </ol>

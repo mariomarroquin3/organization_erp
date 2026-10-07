@@ -8,13 +8,15 @@ import { fmtNum, fmtPct, fullName } from '@/lib/format';
 import { serviceYearLabel } from '@/lib/service-year';
 import { yearContext, type SearchParams } from '@/lib/page';
 import { requireAreaPage } from '@/lib/services/session';
+import { HOURS_ROLE_TITLE } from '@/lib/roles';
 
 export default async function InformeAnualPage({ searchParams }: { searchParams: SearchParams }) {
   await requireAreaPage('METRICAS');
   const { db, sy, years } = await yearContext(searchParams);
   const [o, compliance] = await Promise.all([loadAnnualOverview(db, sy), goalCompliance(db, sy)]);
   const link = (format: 'xlsx' | 'pdf') => `/api/export?informe=anual&anio=${sy}&formato=${format}`;
-  const pr = compliance.filter((c) => c.role_code === 'PR');
+  // PR y PAI siguen todo el año: su resultado se lista persona por persona
+  const yearly = compliance.filter((c) => c.role_code === 'PR' || c.role_code === 'PAI');
 
   return (
     <>
@@ -34,22 +36,24 @@ export default async function InformeAnualPage({ searchParams }: { searchParams:
         <Kpi label="Altas / bajas" value={`${o.altas} / ${o.bajas}`} />
       </section>
 
-      <section className="grid-2">
-        <RoleCard title="PR (meta anual)" t={o.pr} closed={o.closed} />
-        <RoleCard title="PA (meta mensual)" t={o.pa} closed={o.closed} />
+      <section className="grid-3">
+        <RoleCard title={HOURS_ROLE_TITLE.PR} t={o.pr} closed={o.closed} />
+        <RoleCard title={HOURS_ROLE_TITLE.PAI} t={o.pai} closed={o.closed} />
+        <RoleCard title={HOURS_ROLE_TITLE.PA} t={o.pa} closed={o.closed} />
       </section>
 
       <div className="card">
-        <h2>Resultado de cada PR</h2>
-        {pr.length === 0 ? <Empty>Nadie tuvo cargo PR en este año de servicio.</Empty> : (
+        <h2>Resultado de cada PR y PAI</h2>
+        {yearly.length === 0 ? <Empty>Nadie tuvo cargo PR ni PAI en este año de servicio.</Empty> : (
           <table className="table">
             <thead>
-              <tr><th>Persona</th><th className="num">Meses</th><th className="num">Horas</th><th className="num">Meta</th><th>Avance</th><th className="num">Faltan</th><th>Estado</th></tr>
+              <tr><th>Persona</th><th>Cargo</th><th className="num">Meses</th><th className="num">Horas</th><th className="num">Meta</th><th>Avance</th><th className="num">Faltan</th><th>Estado</th></tr>
             </thead>
             <tbody>
-              {pr.map((c) => (
-                <tr key={c.person_id}>
+              {yearly.map((c) => (
+                <tr key={`${c.person_id}-${c.role_code}`}>
                   <td><Link href={`/personas/${c.person_id}?anio=${sy}`}>{fullName(c)}</Link></td>
+                  <td>{c.role_code}</td>
                   <td className="num">{c.months_closed}/{c.months_in_role}</td>
                   <td className="num">{fmtNum(c.hours_done)}</td>
                   <td className="num">{fmtNum(c.goal_hours)}</td>

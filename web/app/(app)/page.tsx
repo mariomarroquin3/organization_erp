@@ -62,13 +62,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
           hint={lastMonth ? <Link href={`/informes?mes=${lastMonth.period.slice(0, 7)}`}>Capturar faltantes</Link> : 'Aún no cierra ningún mes'}
         />
         <Kpi label="Completitud promedio" value={fmtPct(d.avgReported)} hint="Meses informados / meses cerrados" />
-        <Kpi label="Participación (sin PR/PA)" value={fmtPct(d.avgParticipatedOthers)} hint="Promedio de meses con participación" />
+        <Kpi label="Participación (sin PR/PAI/PA)" value={fmtPct(d.avgParticipatedOthers)} hint="Promedio de meses con participación" />
       </section>
 
       <section className="grid-2">
         <div className="card">
-          <h2>Metas PR / PA</h2>
-          {d.byRole.length === 0 ? <Empty>Nadie tuvo cargo PR o PA en este año de servicio.</Empty> : (
+          <h2>Metas PR / PAI / PA</h2>
+          {d.byRole.length === 0 ? <Empty>Nadie tuvo cargo PR, PAI o PA en este año de servicio.</Empty> : (
             <table className="table">
               <thead><tr><th>Cargo</th><th className="num">Personas</th><th className="num">Horas</th><th className="num">Meta</th><th>Avance</th></tr></thead>
               <tbody>
