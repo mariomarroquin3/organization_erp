@@ -10,11 +10,11 @@ const cat: ImportCatalogs = {
     { id: 'g2', name: 'Viejo', description: null, is_active: false },
   ],
   roles: [
-    { id: 'pr', code: 'PR', name: 'PR', requires_hours_report: true, requires_end_date: false, is_active: true, sort_order: 10 },
-    { id: 'pai', code: 'PAI', name: 'PA indefinido', requires_hours_report: true, requires_end_date: false, is_active: true, sort_order: 15 },
-    { id: 'pa', code: 'PA', name: 'PA', requires_hours_report: true, requires_end_date: true, is_active: true, sort_order: 20 },
-    { id: 'pb', code: 'PB', name: 'PB', requires_hours_report: false, requires_end_date: false, is_active: true, sort_order: 30 },
-    { id: 'pnb', code: 'PNB', name: 'Publicador no bautizado', requires_hours_report: false, requires_end_date: false, is_active: true, sort_order: 25 },
+    { id: 'pr', code: 'PR', name: 'PR', requires_hours_report: true, requires_end_date: false, max_months: null, is_active: true, sort_order: 10 },
+    { id: 'pai', code: 'PAI', name: 'PA indefinido', requires_hours_report: true, requires_end_date: false, max_months: null, is_active: true, sort_order: 15 },
+    { id: 'pa', code: 'PA', name: 'PA', requires_hours_report: true, requires_end_date: true, max_months: 3, is_active: true, sort_order: 20 },
+    { id: 'pb', code: 'PB', name: 'PB', requires_hours_report: false, requires_end_date: false, max_months: null, is_active: true, sort_order: 30 },
+    { id: 'pnb', code: 'PNB', name: 'Publicador no bautizado', requires_hours_report: false, requires_end_date: false, max_months: null, is_active: true, sort_order: 25 },
   ],
   contactTypes: [
     { id: 'tel', code: 'PHONE', name: 'Teléfono' }, { id: 'mail', code: 'EMAIL', name: 'Correo' },

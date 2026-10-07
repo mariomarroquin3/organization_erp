@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  lastClosedMonth, parsePeriodKey, parseServiceYear, serviceYearMonths, serviceYearOf, serviceYearOptions, shiftMonth,
+  lastClosedMonth, monthsPeriod, parsePeriodKey, parseServiceYear, serviceYearMonths, serviceYearOf, serviceYearOptions, shiftMonth,
 } from '@/lib/service-year';
 
 describe('año de servicio', () => {
@@ -36,5 +36,13 @@ describe('año de servicio', () => {
     expect(parseServiceYear('abc', today)).toBe(2027);
     expect(serviceYearOptions(2025, today)).toEqual([2027, 2026, 2025]);
     expect(serviceYearOptions(null, today)).toEqual([2027]);
+  });
+});
+
+describe('periodo de un cargo por meses (PA)', () => {
+  it('va del 1 del mes inicial al último día del mes final', () => {
+    expect(monthsPeriod({ year: 2026, month: 9 }, 1)).toEqual({ start_date: '2026-09-01', end_date: '2026-09-30' });
+    expect(monthsPeriod({ year: 2026, month: 12 }, 3)).toEqual({ start_date: '2026-12-01', end_date: '2027-02-28' });
+    expect(monthsPeriod({ year: 2028, month: 1 }, 2)).toEqual({ start_date: '2028-01-01', end_date: '2028-02-29' });
   });
 });

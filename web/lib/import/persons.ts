@@ -253,7 +253,7 @@ export function validateRows(
     }
 
     for (const r of roleList.filter((x) => x.requires_end_date)) {
-      msgs.push(`${r.code} es por meses concretos: agrégalo desde la ficha con su fecha de fin${r.code === 'PA' ? ' (si es indefinido, usa PAI)' : ''}.`);
+      msgs.push(`${r.code} es por meses concretos: agrégalo desde la ficha con "Dar ${r.code}"${r.code === 'PA' ? ' (si es indefinido, usa PAI)' : ''}.`);
     }
 
     if (roleList.some((r) => r.code === 'PB') && roleList.some((r) => r.code === 'PNB')) {

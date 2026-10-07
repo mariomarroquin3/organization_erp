@@ -102,7 +102,7 @@ export default async function ConfiguracionPage() {
 
         <div className="card">
           <h2>Cargos</h2>
-          <p className="muted small">Los cargos “con horas” (PR, PAI, PA) informan horas y pueden tener meta; el resto solo informa si participó. Un cargo “por meses” (PA) siempre lleva fecha de fin; PAI y PR siguen vigentes hasta que se cierren.</p>
+          <p className="muted small">Los cargos “con horas” (PR, PAI, PA) informan horas y pueden tener meta; el resto solo informa si participó. Un cargo “por meses” (PA, de 1 a 3 meses) siempre lleva fecha de fin y al terminar deja su registro; PAI y PR siguen vigentes hasta que se cierren.</p>
           <table className="table compact">
             <tbody>
               {roles.map((r) => canEdit ? (
@@ -115,13 +115,14 @@ export default async function ConfiguracionPage() {
                       <input name="sort_order" type="number" defaultValue={r.sort_order} className="short" aria-label="Orden" />
                       <label className="inline"><input type="checkbox" name="requires_hours_report" defaultChecked={r.requires_hours_report} /> Con horas</label>
                       <label className="inline"><input type="checkbox" name="requires_end_date" defaultChecked={r.requires_end_date} /> Por meses</label>
+                      <label className="inline">Máx. meses <input name="max_months" type="number" min={1} max={120} defaultValue={r.max_months ?? ''} className="short" /></label>
                       <label className="inline"><input type="checkbox" name="is_active" defaultChecked={r.is_active} /> Activo</label>
                       <SubmitButton className="btn-secondary">Guardar</SubmitButton>
                     </ActionForm>
                   </td>
                 </tr>
               ) : (
-                <tr key={r.id}><td><strong>{r.code}</strong> {r.name}{r.requires_hours_report ? ' · con horas' : ''}{r.requires_end_date ? ' · por meses' : ''}{r.is_active ? '' : ' · inactivo'}</td></tr>
+                <tr key={r.id}><td><strong>{r.code}</strong> {r.name}{r.requires_hours_report ? ' · con horas' : ''}{r.requires_end_date ? ` · por meses${r.max_months ? ` (máx. ${r.max_months})` : ''}` : ''}{r.is_active ? '' : ' · inactivo'}</td></tr>
               ))}
             </tbody>
           </table>
@@ -132,6 +133,7 @@ export default async function ConfiguracionPage() {
               <input name="sort_order" type="number" defaultValue={100} className="short" aria-label="Orden" />
               <label className="inline"><input type="checkbox" name="requires_hours_report" /> Con horas</label>
               <label className="inline"><input type="checkbox" name="requires_end_date" /> Por meses</label>
+              <label className="inline">Máx. meses <input name="max_months" type="number" min={1} max={120} className="short" /></label>
               <SubmitButton className="btn-secondary">Agregar</SubmitButton>
             </ActionForm>
           ) : null}

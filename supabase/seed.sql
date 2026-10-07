@@ -3,8 +3,8 @@
 -- =====================================================================
 -- Año de servicio 2026 = sep-2025 a ago-2026 (completo y cerrado).
 --   Ana   : PR todo el año, 50 h/mes        -> 600/600, CUMPLIDA
---   Beto  : PA sep-ene, PR feb-ago, 40 h/mes; además PB todo el año
---           PA: 200/150 CUMPLIDA · PR: 280/350 NO CUMPLIDA
+--   Beto  : PA sep-nov, PAI dic-ene, PR feb-ago, 40 h/mes; además PB todo el año
+--           PA: 120/90 CUMPLIDA · PAI: 80/60 CUMPLIDA · PR: 280/350 NO CUMPLIDA
 --   Carla : solo PB, informa sí/no; 10 de 12 meses; cambia de grupo en marzo
 --   Diego : sin cargo, informa 6 meses
 -- Cursos bíblicos: Ana 2 cada mes; Carla 1 en septiembre; el resto 0.
@@ -31,7 +31,8 @@ insert into public.person_roles (person_id, role_id, start_date, end_date)
 select v.person_id::uuid, cr.id, v.start_date::date, v.end_date::date
 from (values
   ('00000000-0000-0000-0000-000000000001', 'PR', '2025-09-01', null),
-  ('00000000-0000-0000-0000-000000000002', 'PA', '2025-09-01', '2026-01-31'),
+  ('00000000-0000-0000-0000-000000000002', 'PA', '2025-09-01', '2025-11-30'),
+  ('00000000-0000-0000-0000-000000000002', 'PAI', '2025-12-01', '2026-01-31'),
   ('00000000-0000-0000-0000-000000000002', 'PR', '2026-02-01', '2026-08-31'),
   ('00000000-0000-0000-0000-000000000002', 'PB', '2025-09-01', null),
   ('00000000-0000-0000-0000-000000000003', 'PB', '2025-09-01', null)

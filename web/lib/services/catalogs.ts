@@ -10,7 +10,7 @@ export async function listGroups(db: Db, { onlyActive = false } = {}) {
 
 export async function listRoles(db: Db, { onlyActive = false } = {}) {
   let q = db.from('catalog_roles')
-    .select('id, code, name, requires_hours_report, requires_end_date, is_active, sort_order')
+    .select('id, code, name, requires_hours_report, requires_end_date, max_months, is_active, sort_order')
     .order('sort_order').order('code');
   if (onlyActive) q = q.eq('is_active', true);
   return check(await q) as CatalogRole[];
@@ -39,11 +39,12 @@ export async function saveGroup(db: Db, g: { id?: string; name: string; descript
 }
 
 export async function saveRole(db: Db, r: {
-  id?: string; code: string; name: string; requires_hours_report: boolean; requires_end_date: boolean; is_active: boolean; sort_order: number;
+  id?: string; code: string; name: string; requires_hours_report: boolean; requires_end_date: boolean; max_months: number | null;
+  is_active: boolean; sort_order: number;
 }) {
   const row = {
     code: r.code.trim().toUpperCase(), name: r.name.trim(),
-    requires_hours_report: r.requires_hours_report, requires_end_date: r.requires_end_date,
+    requires_hours_report: r.requires_hours_report, requires_end_date: r.requires_end_date, max_months: r.max_months,
     is_active: r.is_active, sort_order: r.sort_order,
   };
   if (r.id) check(await db.from('catalog_roles').update(row).eq('id', r.id));

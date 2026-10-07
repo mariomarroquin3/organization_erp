@@ -10,7 +10,7 @@ import { goalCompliance } from '@/lib/services/metrics';
 import { can, getSession } from '@/lib/services/session';
 import { ServiceError, check } from '@/lib/services/errors';
 import { fmtDate, fmtNum, fmtPct } from '@/lib/format';
-import { MONTH_NAMES, lastClosedMonth, periodKey, serviceYearMonths } from '@/lib/service-year';
+import { MONTH_NAMES, lastClosedMonth, periodKey, serviceYearMonths, shiftMonth } from '@/lib/service-year';
 import { yearContext, type SearchParams } from '@/lib/page';
 import type { HoursRoleMonth } from '@/lib/types';
 import { PersonFields } from '../PersonFields';
@@ -54,6 +54,7 @@ export default async function PersonaPage({ params, searchParams }: {
   const reportOf = new Map(reports.map((r) => [periodKey(r), r]));
   const roleOf = new Map(roleMonths.map((r) => [periodKey(r), r.role_code]));
   const closed = periodKey(lastClosedMonth());
+  const currentMonth = shiftMonth(lastClosedMonth(), 1);
   // Cargos por meses (PA): un periodo abierto es un dato viejo por corregir
   const byMonths = new Set(roles.filter((r) => r.requires_end_date).map((r) => r.code));
   const defaultMonth = months.map(periodKey).filter((k) => k <= closed).pop() ?? periodKey(months[0]);
@@ -207,17 +208,28 @@ export default async function PersonaPage({ params, searchParams }: {
             <input type="hidden" name="person_id" value={id} />
             <select name="role_id" required defaultValue="" aria-label="Cargo">
               <option value="" disabled>Cargo…</option>
-              {roles.map((r) => <option key={r.id} value={r.id}>{r.code} · {r.name}</option>)}
+              {roles.filter((r) => !r.requires_end_date).map((r) => <option key={r.id} value={r.id}>{r.code} · {r.name}</option>)}
             </select>
             <label className="inline">Desde <input type="date" name="start_date" required defaultValue={today()} /></label>
             <label className="inline">Hasta <input type="date" name="end_date" /></label>
             <SubmitButton className="btn-secondary">Agregar cargo</SubmitButton>
           </ActionForm>
         ) : null}
+        {canEditPersons ? roles.filter((r) => r.requires_end_date).map((r) => (
+          <ActionForm key={r.id} action={A.addMonthsRoleAction} className="inline-form" resetOnSuccess>
+            <input type="hidden" name="person_id" value={id} /><input type="hidden" name="role_id" value={r.id} />
+            <strong>Dar {r.code}</strong>
+            <label className="inline">desde <input type="month" name="mes" required defaultValue={periodKey(currentMonth)} /></label>
+            <select name="meses" defaultValue="1" aria-label="Meses">
+              {Array.from({ length: r.max_months ?? 3 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n === 1 ? '1 mes' : `${n} meses`}</option>)}
+            </select>
+            <SubmitButton className="btn-secondary">Agregar {r.code}</SubmitButton>
+          </ActionForm>
+        )) : null}
         {canEditPersons ? (
           <p className="muted small">
-            PA es por meses concretos: indica “Hasta” (por ejemplo, del 1 al 30 de septiembre para solo septiembre).
-            PAI (PA indefinido) y PR quedan vigentes hasta que se cierren. Un mes en que tuvo el cargo, aunque sea parte del mes, cuenta completo.
+            PA es de 1 a 3 meses: al terminar se desmarca solo y quedan registrados esos meses con sus horas.
+            PAI (30 h cada mes) y PR quedan vigentes hasta que se cierren. Un mes en que tuvo el cargo, aunque sea parte del mes, cuenta completo.
           </p>
         ) : null}
       </section>

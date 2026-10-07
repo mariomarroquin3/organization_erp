@@ -49,6 +49,24 @@ select pg_temp.expect_error($$
   where role_id = (select id from catalog_roles where code = 'PA')
 $$, '%meses concretos%');
 
+-- PA dura de 1 a 3 meses (cuenta cada mes calendario que toca)
+select pg_temp.expect_error($$
+  insert into person_roles (person_id, role_id, start_date, end_date)
+  select '00000000-0000-0000-0000-000000000004', id, '2026-09-15', '2026-12-01' from catalog_roles where code = 'PA'
+$$, '%PA dura como máximo 3 meses; este periodo abarca 4%usa PAI%');
+select pg_temp.expect_error($$
+  update person_roles set end_date = '2026-02-28'
+  where role_id = (select id from catalog_roles where code = 'PA')
+$$, '%como máximo 3 meses%');
+savepoint pa3;
+insert into person_roles (person_id, role_id, start_date, end_date)
+select '00000000-0000-0000-0000-000000000004', id, '2026-09-15', '2026-11-30' from catalog_roles where code = 'PA';
+select pg_temp.check(
+  (select count(*) = 3 from view_hours_role_months m join persons p on p.id = m.person_id
+    where p.first_name = 'Diego' and m.role_code = 'PA'),
+  'PA sep-nov: quedan registrados 3 meses de PA');
+rollback to savepoint pa3;
+
 -- Beto fue PR feb-ago 2026: un PA cerrado dentro de ese rango también choca
 select pg_temp.expect_error($$
   insert into person_roles (person_id, role_id, start_date, end_date)
@@ -115,9 +133,14 @@ select pg_temp.check(
   'Ana PR 2026: 600/600 CUMPLIDA');
 
 select pg_temp.check(
-  (select goal_hours = 150 and hours_done = 200 and status = 'CUMPLIDA'
+  (select goal_hours = 90 and hours_done = 120 and status = 'CUMPLIDA'
      from view_goal_compliance where first_name = 'Beto' and service_year = 2026 and role_code = 'PA'),
-  'Beto PA 2026: meta 5x30=150, 200 h, CUMPLIDA');
+  'Beto PA sep-nov 2026: meta 3x30=90, 120 h, CUMPLIDA');
+
+select pg_temp.check(
+  (select goal_hours = 60 and hours_done = 80 and status = 'CUMPLIDA'
+     from view_goal_compliance where first_name = 'Beto' and service_year = 2026 and role_code = 'PAI'),
+  'Beto PAI dic-ene 2026: meta 2x30=60, 80 h, CUMPLIDA');
 
 select pg_temp.check(
   (select goal_hours = 350 and hours_done = 280 and hours_remaining = 70 and status = 'NO CUMPLIDA'
@@ -361,7 +384,7 @@ set local role authenticated;
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000003';
 select pg_temp.check((select count(*) = 4 from persons), 'lector lee personas');
 select pg_temp.check((select count(*) = 1 from person_contacts), 'lector con PERSONAS lee contactos');
-select pg_temp.check((select count(*) = 3 from view_goal_compliance where service_year = 2026), 'lector lee cumplimiento (vista respeta RLS)');
+select pg_temp.check((select count(*) = 4 from view_goal_compliance where service_year = 2026), 'lector lee cumplimiento (vista respeta RLS)');
 select pg_temp.check((select count(*) = 1 from app_users), 'lector solo ve su cuenta');
 select pg_temp.check((select count(*) = 5 from app_user_permissions), 'lector ve sus propios permisos');
 select pg_temp.check((select count(*) = 0 from permission_templates), 'lector no ve plantillas');

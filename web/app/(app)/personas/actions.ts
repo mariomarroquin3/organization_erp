@@ -9,7 +9,7 @@ import * as movements from '@/lib/services/movements';
 import { savePersonMonth } from '@/lib/services/reports';
 import { ServiceError } from '@/lib/services/errors';
 import { optStr, required, runAction, str, type ActionState } from '@/lib/action';
-import { parsePeriodKey } from '@/lib/service-year';
+import { monthsPeriod, parsePeriodKey } from '@/lib/service-year';
 import type { ReportState } from '@/lib/services/report-plan';
 
 async function editor(area: Area = 'PERSONAS') {
@@ -108,6 +108,21 @@ export async function addRoleAction(_p: ActionState, fd: FormData): Promise<Acti
       notes: optStr(fd, 'notes'),
     });
     return done(person_id, 'Cargo agregado.');
+  });
+}
+
+/** PA (cargo por meses): mes inicial y cuántos meses; se cierra solo al terminar. */
+export async function addMonthsRoleAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  return runAction(async () => {
+    const person_id = required(fd, 'person_id', 'la persona');
+    const start = parsePeriodKey(str(fd, 'mes'));
+    if (!start) throw new ServiceError('Indica el mes en que empieza.');
+    const months = Number(str(fd, 'meses'));
+    if (!Number.isInteger(months) || months < 1 || months > 12) throw new ServiceError('Indica cuántos meses.');
+    await persons.addRolePeriod(await editor(), {
+      person_id, role_id: required(fd, 'role_id', 'el cargo'), ...monthsPeriod(start, months), notes: null,
+    });
+    return done(person_id, months === 1 ? 'Cargo agregado por 1 mes.' : `Cargo agregado por ${months} meses.`);
   });
 }
 

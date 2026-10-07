@@ -59,6 +59,16 @@ export function periodDate({ year, month }: YearMonth): string {
   return `${periodKey({ year, month })}-01`;
 }
 
+/**
+ * Periodo de un cargo por meses (PA): del 1 del mes inicial al último día
+ * del mes final. "2026-09", 2 -> 2026-09-01 a 2026-10-31.
+ */
+export function monthsPeriod(start: YearMonth, months: number): { start_date: string; end_date: string } {
+  const last = shiftMonth(start, months - 1);
+  const days = new Date(Date.UTC(last.year, last.month, 0)).getUTCDate();
+  return { start_date: periodDate(start), end_date: `${periodKey(last)}-${String(days).padStart(2, '0')}` };
+}
+
 export function monthLabel({ year, month }: YearMonth): string {
   return `${MONTH_NAMES[month - 1]} ${year}`;
 }
